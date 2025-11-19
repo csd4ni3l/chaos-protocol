@@ -1,0 +1,10 @@
+[project]
+name = "chaos-protocol"
+version = "0.1.0"
+description = "Chaos Protocol"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+ "arcade>=3.3.3",
+ "pypresence>=4.3.0",
+]
