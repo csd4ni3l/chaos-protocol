@@ -2,28 +2,48 @@ from utils.constants import DO_RULES, IF_RULES, LOGICAL_OPERATORS, NON_COMPATIBL
 
 import random
 
+IF_KEYS = tuple(IF_RULES.keys())
+DO_KEYS = tuple(DO_RULES.keys())
+
+BAD_WHEN = {tuple(sorted(pair)) for pair in NON_COMPATIBLE_WHEN}
+BAD_DO_WHEN = {tuple(pair) for pair in NON_COMPATIBLE_DO_WHEN}
+
 def generate_rule():
-    when_a = random.choice(list(IF_RULES.keys()))
-    when_b = None
+    when_a = random.choice(IF_KEYS)
 
     if random.random() < 0.5:
-        when_b = random.choice(list(IF_RULES.keys()))
-        while (when_a, when_b) in NON_COMPATIBLE_WHEN or (when_b, when_a) in NON_COMPATIBLE_WHEN or when_a == when_b:
-            when_a = random.choice(list(IF_RULES.keys()))
-            when_b = random.choice(list(IF_RULES.keys()))            
+        valid_b = [
+            b for b in IF_KEYS
+            if b != when_a and tuple(sorted((when_a, b))) not in BAD_WHEN
+        ]
 
-        logical_operation = random.choice(LOGICAL_OPERATORS)
+        if not valid_b:
+            return [when_a, random.choice(DO_KEYS)]
+
+        when_b = random.choice(valid_b)
+        logical = random.choice(LOGICAL_OPERATORS)
     else:
-        logical_operation = None
+        when_b = None
+        logical = None
 
-    do = random.choice(list(DO_RULES.keys()))
-    while (when_a, do) in NON_COMPATIBLE_DO_WHEN or (do, when_a) in NON_COMPATIBLE_DO_WHEN or (when_b, do) in NON_COMPATIBLE_DO_WHEN or (do, when_b) in NON_COMPATIBLE_DO_WHEN:
-        do = random.choice(list(DO_RULES.keys()))
-
-    if logical_operation:
-        return [IF_RULES[when_a], logical_operation, IF_RULES[when_b], DO_RULES[do]]
+    if when_b:
+        valid_do = [
+            d for d in DO_KEYS
+            if (when_a, d) not in BAD_DO_WHEN
+            and (when_b, d) not in BAD_DO_WHEN
+            and (d, when_a) not in BAD_DO_WHEN
+            and (d, when_b) not in BAD_DO_WHEN
+        ]
     else:
-        return [IF_RULES[when_a], DO_RULES[do]]
-    
-def generate_rules(n):
-    return [generate_rule() for _ in range(n)]
+        valid_do = [
+            d for d in DO_KEYS
+            if (when_a, d) not in BAD_DO_WHEN
+            and (d, when_a) not in BAD_DO_WHEN
+        ]
+
+    do = random.choice(valid_do)
+
+    if logical:
+        return [when_a, logical, when_b, do]
+    else:
+        return [when_a, do]

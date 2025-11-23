@@ -7,7 +7,7 @@ LOGICAL_OPERATORS = ["and", "or"]
 SHAPES = ["rectangle", "circle", "triangle"]
 VAR_NAMES = ["a", "b", "c", "d", "e", "f", "g"]
 
-DEFAULT_GRAVITY = 5
+DEFAULT_GRAVITY = 2
 DEFAULT_X_VELOCITY = 0
 DEFAULT_Y_VELOCITY = 0
 
@@ -25,12 +25,13 @@ VAR_OPTIONS = {
     "shape_type": SHAPES,
     "target_type": SHAPES,
     "variable": (0, 2500),
-    "color": "WHITE",
+    "color": COLORS,
     "size": (1, 200), 
 }
 
 IF_RULES = {
     "x_position": {
+        "key": "x_position",
         "description": "IF X for {a} shape is {b}",
         "trigger": "every_update",
         "user_vars": ["shape_type", "variable"],
@@ -38,6 +39,7 @@ IF_RULES = {
         "func": lambda *v: (v[0] == v[2]) and (v[3] == v[1])
     },
     "y_position": {
+        "key": "y_position",
         "description": "IF Y for {a} shape is {b}",
         "trigger": "every_update",
         "user_vars": ["shape_type", "variable"],
@@ -45,6 +47,7 @@ IF_RULES = {
         "func": lambda *v: (v[0] == v[2]) and (v[3] == v[1])
     },
     "color_is": {
+        "key": "color_is",
         "description": "IF {a} shape color is {b}",
         "trigger": "every_update",
         "user_vars": ["shape_type", "color"],
@@ -52,6 +55,7 @@ IF_RULES = {
         "func": lambda *v: (v[0] == v[2]) and (v[3] == v[1])
     },
     "size_is": {
+        "key": "size_is",
         "description": "IF {a} shape size is {b}",
         "trigger": "every_update",
         "user_vars": ["shape_type", "size"],
@@ -59,6 +63,7 @@ IF_RULES = {
         "func": lambda *v: (v[0] == v[2]) and (v[3] == v[1])
     },
     "spawns": {
+        "key": "spawns",
         "description": "IF {a} shape spawns",
         "trigger": "spawns",
         "user_vars": ["shape_type"],
@@ -66,6 +71,7 @@ IF_RULES = {
         "func": lambda *v: v[0] == v[1]
     },
     "destroyed": {
+        "key": "destroyed",
         "description": "IF {a} shape is destroyed",
         "trigger": "destroyed",
         "user_vars": ["shape_type"],
@@ -73,6 +79,7 @@ IF_RULES = {
         "func": lambda *v: v[0] == v[1]
     },
     "x_velocity_changes": {
+        "key": "x_velocity_changes",
         "description": "IF {a} shape X velocity changes",
         "trigger": "x_change",
         "user_vars": ["shape_type"],
@@ -80,6 +87,7 @@ IF_RULES = {
         "func": lambda *v: v[0] == v[1]
     },
     "y_velocity_changes": {
+        "key": "y_velocity_changes",
         "description": "IF {a} shape Y velocity changes",
         "trigger": "y_change",
         "user_vars": ["shape_type"],
@@ -87,6 +95,7 @@ IF_RULES = {
         "func": lambda *v: v[0] == v[1]
     },
     "x_gravity_changes": {
+        "key": "x_gravity_changes",
         "description": "IF {a} shape X gravity changes",
         "trigger": "gravity_x_change",
         "user_vars": ["shape_type"],
@@ -94,6 +103,7 @@ IF_RULES = {
         "func": lambda *v: v[0] == v[1]
     },
     "y_gravity_changes": {
+        "key": "y_gravity_changes",
         "description": "IF {a} shape Y gravity changes",
         "trigger": "gravity_y_change",
         "user_vars": ["shape_type"],
@@ -101,6 +111,7 @@ IF_RULES = {
         "func": lambda *v: v[0] == v[1]
     },
     "gravity_changes": {
+        "key": "gravity_changes",
         "description": "IF gravity changes",
         "user_vars": [],
         "trigger": "gravity_change",
@@ -108,6 +119,7 @@ IF_RULES = {
         "func": lambda *v: True
     },
     "color_changes": {
+        "key": "color_changes",
         "description": "IF {a} shape color changes",
         "trigger": "color_change",
         "user_vars": ["shape_type"],
@@ -115,6 +127,7 @@ IF_RULES = {
         "func": lambda *v: v[0] == v[1]
     },
     "size_changes": {
+        "key": "size_changes",
         "description": "IF {a} shape size changes",
         "trigger": "size_change",
         "user_vars": ["shape_type"],
@@ -122,6 +135,7 @@ IF_RULES = {
         "func": lambda *v: v[0] == v[1]
     },
     "morphs": {
+        "key": "morphs",
         "description": "IF {a} shape morphs into {b}",
         "trigger": "morph",
         "user_vars": ["shape_type", "target_type"],
@@ -129,13 +143,15 @@ IF_RULES = {
         "func": lambda *v: (v[0] == v[2]) and (v[3] == v[1])
     },
     "collides": {
+        "key": "collides",
         "description": "IF {a} shape collides with {b}",
         "trigger": "collision",
         "user_vars": ["shape_type", "target_type"],
         "vars": ["shape_type", "target_type", "event_a_type", "event_b_type"],
         "func": lambda *v: (v[0] == v[2]) and (v[3] == v[1])
     },
-    "launch": {
+    "game_launch": {
+        "key": "game_launch",
         "description": "IF game launches",
         "trigger": "game_launch",
         "user_vars": [],
@@ -143,6 +159,7 @@ IF_RULES = {
         "func": lambda *v: True
     },
     "every_update": {
+        "key": "every_update",
         "description": "Every update",
         "trigger": "every_update",
         "user_vars": [],
@@ -266,72 +283,84 @@ NON_COMPATIBLE_DO_WHEN = [
 
 DO_RULES = {
     "change_x": {
+        "key": "change_x",
         "description": "Change this shape's X to {a}",
         "action": {"type": "shape_action", "name": "change_x"},
-        "user_vars": ["variable"]
+        "user_vars": ["shape", "variable"]
     },
 
     "change_y": {
+        "key": "change_y",
         "description": "Change this shape's Y to {a}",
         "action": {"type": "shape_action", "name": "change_y"},
-        "user_vars": ["variable"]
+        "user_vars": ["shape", "variable"]
     },
 
     "move_x": {
+        "key": "move_x",
         "description": "Move this shape's X by {a}",
         "action": {"type": "shape_action", "name": "move_x"},
-        "user_vars": ["variable"]
+        "user_vars": ["shape", "variable"]
     },
 
     "move_y": {
+        "key": "move_y",
         "description": "Move this shape's Y by {a}",
         "action": {"type": "shape_action", "name": "move_y"},
-        "user_vars": ["variable"]
+        "user_vars": ["shape", "variable"]
     },
 
     "change_x_velocity": {
+        "key": "change_x_velocity",
         "description": "Change X velocity of this to {a}",
         "action": {"type": "shape_action", "name": "change_x_vel"},
-        "user_vars": ["variable"]
+        "user_vars": ["shape", "variable"]
     },
 
     "change_y_velocity": {
+        "key": "change_y_velocity",
         "description": "Change Y velocity of this to {a}",
         "action": {"type": "shape_action", "name": "change_y_vel"},
-        "user_vars": ["variable"]
+        "user_vars": ["shape", "variable"]
     },
 
     "change_color": {
+        "key": "change_color",
         "description": "Change this shape's color to {a}",
         "action": {"type": "shape_action", "name": "change_color"},
-        "user_vars": ["color"]
+        "user_vars": ["shape", "color"]
     },
 
     "change_size": {
+        "key": "change_size",
         "description": "Change this shape's size to {a}",
         "action": {"type": "shape_action", "name": "change_size"},
-        "user_vars": ["size"]
+        "user_vars": ["shape", "size"]
     },
 
     "destroy": {
+        "key": "destroy",
         "description": "Destroy this",
         "action": {"type": "shape_action", "name": "destroy"},
-        "user_vars": []
+        "user_vars": ["shape"]
     },
 
     "morph_into": {
+        "key": "morph_into",
         "description": "Morph this into {a}",
         "action": {"type": "shape_action", "name": "morph"},
-        "user_vars": ["shape_type"]
+        "user_vars": ["shape", "shape_type"]
     },
 
     "change_gravity": {
-        "description": "Change this shape's gravity to {a}",
-        "action": {"type": "shape_action", "name": "change_gravity"},
-        "user_vars": ["variable"]
+        "key": "change_gravity",
+        "description": "Change gravity to {a}",
+        "action": {"type": "global_action", "name": "change_gravity"},
+        "user_vars": ["shape", "variable"]
     },
 
     "spawn": {
+        "key": "spawn",
         "description": "Spawn {a}",
         "action": {"type": "global_action", "name": "spawn"},
         "user_vars": ["shape_type"]
