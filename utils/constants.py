@@ -7,11 +7,27 @@ LOGICAL_OPERATORS = ["and", "or"]
 SHAPES = ["rectangle", "circle", "triangle"]
 VAR_NAMES = ["a", "b", "c", "d", "e", "f", "g"]
 
-DEFAULT_GRAVITY = 2
+DEFAULT_X_GRAVITY = 0
+DEFAULT_Y_GRAVITY = 2
+
 DEFAULT_X_VELOCITY = 0
 DEFAULT_Y_VELOCITY = 0
 
-COLORS = [key for key, value in arcade.color.__dict__.items() if isinstance(value, Color)]
+ALLOWED_INPUT = [ord(key) for key in ["a", "b", "c", "d", "e", "q", "w", "s", "t"]]
+
+COLORS = [
+    "BLACK", "WHITE", "GRAY", "DARK_GRAY", "CYAN", 
+    "AMBER", "AQUA", "GREEN", "LIGHT_GREEN",
+    "RED", "LIGHT_RED", "DARK_RED",
+    "BLUE", "LIGHT_BLUE", "DARK_BLUE",
+    "YELLOW", "LIGHT_YELLOW", "DARK_YELLOW",
+    "MAGENTA", "PURPLE", "VIOLET", "INDIGO",
+    "ORANGE", "BROWN",
+    "GOLD", "SILVER", "BRONZE",
+    "TEAL", "AZURE",
+    "PINK", "HOT_PINK",
+    "MINT_GREEN", "CHARTREUSE"
+]
 
 VAR_DEFAULT = {
     "shape_type": SHAPES[0],
@@ -19,49 +35,94 @@ VAR_DEFAULT = {
     "variable": 0,
     "color": "WHITE",
     "size": 10,
+    "key_input": ALLOWED_INPUT[0]
 }
 
 VAR_OPTIONS = {
     "shape_type": SHAPES,
     "target_type": SHAPES,
-    "variable": (0, 2500),
+    "variable": (-700, 700),
     "color": COLORS,
-    "size": (1, 200), 
+    "size": (1, 200),
+    "key_input": ALLOWED_INPUT
 }
 
 IF_RULES = {
-    "x_position": {
-        "key": "x_position",
-        "description": "IF X for {a} shape is {b}",
+    "x_position_greater": {
+        "key": "x_position_greater",
+        "description": "IF X for {a} shape is greater than {b}",
         "trigger": "every_update",
         "user_vars": ["shape_type", "variable"],
         "vars": ["shape_type", "variable", "event_shape_type", "shape_x"],
-        "func": lambda *v: (v[0] == v[2]) and (v[3] == v[1])
+        "func": lambda *v: (v[0] == v[2]) and (v[3] > v[1])
     },
-    "y_position": {
-        "key": "y_position",
-        "description": "IF Y for {a} shape is {b}",
+    "x_position_less": {
+        "key": "x_position_less",
+        "description": "IF X for {a} shape is less than {b}",
+        "trigger": "every_update",
+        "user_vars": ["shape_type", "variable"],
+        "vars": ["shape_type", "variable", "event_shape_type", "shape_x"],
+        "func": lambda *v: (v[0] == v[2]) and (v[3] < v[1])
+    },
+    "x_position_between": {
+        "key": "x_position_between",
+        "description": "IF X for {a} shape is between {b} and {c}",
+        "trigger": "every_update",
+        "user_vars": ["shape_type", "variable", "variable"],
+        "vars": ["shape_type", "variable", "variable", "event_shape_type", "shape_x"],
+        "func": lambda *v: (v[0] == v[3]) and (min(v[1], v[2]) <= v[4] <= max(v[1], v[2]))
+    },
+    
+    "y_position_greater": {
+        "key": "y_position_greater",
+        "description": "IF Y for {a} shape is greater than {b}",
         "trigger": "every_update",
         "user_vars": ["shape_type", "variable"],
         "vars": ["shape_type", "variable", "event_shape_type", "shape_y"],
-        "func": lambda *v: (v[0] == v[2]) and (v[3] == v[1])
+        "func": lambda *v: (v[0] == v[2]) and (v[3] > v[1])
     },
-    "color_is": {
-        "key": "color_is",
-        "description": "IF {a} shape color is {b}",
+    "y_position_less": {
+        "key": "y_position_less",
+        "description": "IF Y for {a} shape is less than {b}",
         "trigger": "every_update",
-        "user_vars": ["shape_type", "color"],
-        "vars": ["shape_type", "color", "event_shape_type", "shape_color"],
-        "func": lambda *v: (v[0] == v[2]) and (v[3] == v[1])
+        "user_vars": ["shape_type", "variable"],
+        "vars": ["shape_type", "variable", "event_shape_type", "shape_y"],
+        "func": lambda *v: (v[0] == v[2]) and (v[3] < v[1])
     },
-    "size_is": {
-        "key": "size_is",
-        "description": "IF {a} shape size is {b}",
+    "y_position_between": {
+        "key": "y_position_between",
+        "description": "IF Y for {a} shape is between {b} and {c}",
         "trigger": "every_update",
-        "user_vars": ["shape_type", "size"],
-        "vars": ["shape_type", "size", "event_shape_type", "shape_size"],
-        "func": lambda *v: (v[0] == v[2]) and (v[3] == v[1])
+        "user_vars": ["shape_type", "variable", "variable"],
+        "vars": ["shape_type", "variable", "variable", "event_shape_type", "shape_y"],
+        "func": lambda *v: (v[0] == v[3]) and (min(v[1], v[2]) <= v[4] <= max(v[1], v[2]))
     },
+    
+    "size_greater": {
+        "key": "size_greater",
+        "description": "IF {a} shape size is greater than {b}",
+        "trigger": "every_update",
+        "user_vars": ["shape_type", "variable"],
+        "vars": ["shape_type", "variable", "event_shape_type", "shape_size"],
+        "func": lambda *v: (v[0] == v[2]) and (v[3] > v[1])
+    },
+    "size_less": {
+        "key": "size_less",
+        "description": "IF {a} shape size is less than {b}",
+        "trigger": "every_update",
+        "user_vars": ["shape_type", "variable"],
+        "vars": ["shape_type", "variable", "event_shape_type", "shape_size"],
+        "func": lambda *v: (v[0] == v[2]) and (v[3] < v[1])
+    },
+    "size_between": {
+        "key": "size_between",
+        "description": "IF {a} shape size is between {b} and {c}",
+        "trigger": "every_update",
+        "user_vars": ["shape_type", "variable", "variable"],
+        "vars": ["shape_type", "variable", "variable", "event_shape_type", "shape_size"],
+        "func": lambda *v: (v[0] == v[3]) and (min(v[1], v[2]) <= v[4] <= max(v[1], v[2]))
+    },
+    
     "spawns": {
         "key": "spawns",
         "description": "IF {a} shape spawns",
@@ -81,7 +142,7 @@ IF_RULES = {
     "x_velocity_changes": {
         "key": "x_velocity_changes",
         "description": "IF {a} shape X velocity changes",
-        "trigger": "x_change",
+        "trigger": "x_velocity_change",
         "user_vars": ["shape_type"],
         "vars": ["shape_type", "event_shape_type"],
         "func": lambda *v: v[0] == v[1]
@@ -89,7 +150,7 @@ IF_RULES = {
     "y_velocity_changes": {
         "key": "y_velocity_changes",
         "description": "IF {a} shape Y velocity changes",
-        "trigger": "y_change",
+        "trigger": "y_velocity_change",
         "user_vars": ["shape_type"],
         "vars": ["shape_type", "event_shape_type"],
         "func": lambda *v: v[0] == v[1]
@@ -109,14 +170,6 @@ IF_RULES = {
         "user_vars": ["shape_type"],
         "vars": ["shape_type", "event_shape_type"],
         "func": lambda *v: v[0] == v[1]
-    },
-    "gravity_changes": {
-        "key": "gravity_changes",
-        "description": "IF gravity changes",
-        "user_vars": [],
-        "trigger": "gravity_change",
-        "vars": [],
-        "func": lambda *v: True
     },
     "color_changes": {
         "key": "color_changes",
@@ -150,6 +203,38 @@ IF_RULES = {
         "vars": ["shape_type", "target_type", "event_a_type", "event_b_type"],
         "func": lambda *v: (v[0] == v[2]) and (v[3] == v[1])
     },
+    "on_left_click": {
+        "key": "on_left_click",
+        "description": "IF you left click",
+        "trigger": "on_left_click",
+        "user_vars": [],
+        "vars": [],
+        "func": lambda *v: True
+    },
+    "on_right_click": {
+        "key": "on_right_click",
+        "description": "IF you right click",
+        "trigger": "on_right_click",
+        "user_vars": [],
+        "vars": [],
+        "func": lambda *v: True
+    },
+    "on_mouse_move": {
+        "key": "on_mouse_move",
+        "description": "IF mouse moves",
+        "trigger": "on_mouse_move",
+        "user_vars": [],
+        "vars": [],
+        "func": lambda *v: True
+    },
+    "on_input": {
+        "key": "on_input",
+        "description": "IF {a} key is pressed",
+        "trigger": "on_input",
+        "user_vars": ["key_input"],
+        "vars": ["key_input", "event_key"],
+        "func": lambda *v: v[0] == v[1]
+    },    
     "game_launch": {
         "key": "game_launch",
         "description": "IF game launches",
@@ -176,39 +261,29 @@ NON_COMPATIBLE_WHEN = [
     ("spawns", "y_velocity_changes"),
     ("spawns", "x_gravity_changes"),
     ("spawns", "y_gravity_changes"),
-    ("spawns", "gravity_changes"),
     ("spawns", "color_changes"),
     ("spawns", "size_changes"),
-
+    
     ("destroyed", "morphs"),
     ("destroyed", "collides"),
     ("destroyed", "x_velocity_changes"),
     ("destroyed", "y_velocity_changes"),
     ("destroyed", "x_gravity_changes"),
     ("destroyed", "y_gravity_changes"),
-    ("destroyed", "gravity_changes"),
     ("destroyed", "color_changes"),
     ("destroyed", "size_changes"),
-
+    
     ("morphs", "collides"),
     ("morphs", "x_velocity_changes"),
     ("morphs", "y_velocity_changes"),
     ("morphs", "x_gravity_changes"),
     ("morphs", "y_gravity_changes"),
-    ("morphs", "gravity_changes"),
     ("morphs", "color_changes"),
     ("morphs", "size_changes"),
-
+    
     ("collides", "destroyed"),
     ("collides", "morphs"),
-    ("collides", "gravity_changes"),
-
-    ("x_gravity_changes", "gravity_changes"),
-    ("y_gravity_changes", "gravity_changes"),
-
-    ("color_changes", "gravity_changes"),
-    ("size_changes", "gravity_changes"),
-
+    
     ("every_update", "spawns"),
     ("every_update", "destroyed"),
     ("every_update", "morphs"),
@@ -217,22 +292,20 @@ NON_COMPATIBLE_WHEN = [
     ("every_update", "y_velocity_changes"),
     ("every_update", "x_gravity_changes"),
     ("every_update", "y_gravity_changes"),
-    ("every_update", "gravity_changes"),
     ("every_update", "color_changes"),
     ("every_update", "size_changes"),
-    ("every_update", "launch"),
-
-    ("launch", "spawns"),
-    ("launch", "destroyed"),
-    ("launch", "morphs"),
-    ("launch", "collides"),
-    ("launch", "x_velocity_changes"),
-    ("launch", "y_velocity_changes"),
-    ("launch", "x_gravity_changes"),
-    ("launch", "y_gravity_changes"),
-    ("launch", "gravity_changes"),
-    ("launch", "color_changes"),
-    ("launch", "size_changes"),
+    ("every_update", "game_launch"),
+    
+    ("game_launch", "spawns"),
+    ("game_launch", "destroyed"),
+    ("game_launch", "morphs"),
+    ("game_launch", "collides"),
+    ("game_launch", "x_velocity_changes"),
+    ("game_launch", "y_velocity_changes"),
+    ("game_launch", "x_gravity_changes"),
+    ("game_launch", "y_gravity_changes"),
+    ("game_launch", "color_changes"),
+    ("game_launch", "size_changes"),
 ]
 
 NON_COMPATIBLE_DO_WHEN = [
@@ -242,43 +315,45 @@ NON_COMPATIBLE_DO_WHEN = [
     ("destroyed", "move_y"),
     ("destroyed", "change_x_velocity"),
     ("destroyed", "change_y_velocity"),
-    ("destroyed", "change_gravity"),
+    ("destroyed", "change_x_gravity"),
+    ("destroyed", "change_y_gravity"),
     ("destroyed", "change_color"),
     ("destroyed", "change_size"),
     ("destroyed", "morph_into"),
     ("destroyed", "destroy"),
-
+    
     ("morphs", "morph_into"),
-
-    ("gravity_changes", "change_x"),
-    ("gravity_changes", "change_y"),
-    ("gravity_changes", "move_x"),
-    ("gravity_changes", "move_y"),
-    ("gravity_changes", "change_x_velocity"),
-    ("gravity_changes", "change_y_velocity"),
-    ("gravity_changes", "change_gravity"),
-    ("gravity_changes", "change_color"),
-    ("gravity_changes", "change_size"),
-    ("gravity_changes", "morph_into"),
-    ("gravity_changes", "destroy"),
-
+    
     ("x_velocity_changes", "change_x_velocity"),
     ("y_velocity_changes", "change_y_velocity"),
     
     ("color_changes", "change_color"),
+    
     ("size_changes", "change_size"),
-
-    ("launch", "change_x"),
-    ("launch", "change_y"),
-    ("launch", "move_x"),
-    ("launch", "move_y"),
-    ("launch", "change_x_velocity"),
-    ("launch", "change_y_velocity"),
-    ("launch", "change_gravity"),
-    ("launch", "change_color"),
-    ("launch", "change_size"),
-    ("launch", "destroy"),
-    ("launch", "morph_into")
+    
+    ("every_update", "change_x"),
+    ("every_update", "change_y"),
+    ("every_update", "move_x"),
+    ("every_update", "move_y"),
+    ("every_update", "change_x_velocity"),
+    ("every_update", "change_y_velocity"),
+    ("every_update", "change_color"),
+    ("every_update", "change_size"),
+    ("every_update", "destroy"),
+    ("every_update", "morph_into"),
+    
+    ("game_launch", "change_x"),
+    ("game_launch", "change_y"),
+    ("game_launch", "move_x"),
+    ("game_launch", "move_y"),
+    ("game_launch", "change_x_velocity"),
+    ("game_launch", "change_y_velocity"),
+    ("game_launch", "change_x_gravity"),
+    ("game_launch", "change_y_gravity"),
+    ("game_launch", "change_color"),
+    ("game_launch", "change_size"),
+    ("game_launch", "destroy"),
+    ("game_launch", "morph_into")
 ]
 
 DO_RULES = {
@@ -286,84 +361,104 @@ DO_RULES = {
         "key": "change_x",
         "description": "Change this shape's X to {a}",
         "action": {"type": "shape_action", "name": "change_x"},
-        "user_vars": ["shape", "variable"]
+        "user_vars": ["variable"],
+        "vars": ["shape", "variable"]
     },
 
     "change_y": {
         "key": "change_y",
         "description": "Change this shape's Y to {a}",
         "action": {"type": "shape_action", "name": "change_y"},
-        "user_vars": ["shape", "variable"]
+        "user_vars": ["variable"],
+        "vars": ["shape", "variable"]
     },
 
     "move_x": {
         "key": "move_x",
         "description": "Move this shape's X by {a}",
         "action": {"type": "shape_action", "name": "move_x"},
-        "user_vars": ["shape", "variable"]
+        "user_vars": ["variable"],
+        "vars": ["shape", "variable"]
     },
 
     "move_y": {
         "key": "move_y",
         "description": "Move this shape's Y by {a}",
         "action": {"type": "shape_action", "name": "move_y"},
-        "user_vars": ["shape", "variable"]
+        "user_vars": ["variable"],
+        "vars": ["shape", "variable"]
     },
 
     "change_x_velocity": {
         "key": "change_x_velocity",
         "description": "Change X velocity of this to {a}",
-        "action": {"type": "shape_action", "name": "change_x_vel"},
-        "user_vars": ["shape", "variable"]
+        "action": {"type": "shape_action", "name": "change_x_velocity"},
+        "user_vars": ["variable"],
+        "vars": ["shape", "variable"]
     },
 
     "change_y_velocity": {
         "key": "change_y_velocity",
         "description": "Change Y velocity of this to {a}",
-        "action": {"type": "shape_action", "name": "change_y_vel"},
-        "user_vars": ["shape", "variable"]
+        "action": {"type": "shape_action", "name": "change_y_velocity"},
+        "user_vars": ["variable"],
+        "vars": ["shape", "variable"]
     },
 
     "change_color": {
         "key": "change_color",
         "description": "Change this shape's color to {a}",
         "action": {"type": "shape_action", "name": "change_color"},
-        "user_vars": ["shape", "color"]
+        "user_vars": ["color"],
+        "vars": ["shape", "color"]
     },
 
     "change_size": {
         "key": "change_size",
         "description": "Change this shape's size to {a}",
         "action": {"type": "shape_action", "name": "change_size"},
-        "user_vars": ["shape", "size"]
+        "user_vars": ["size"],
+        "vars": ["shape", "size"]
     },
 
     "destroy": {
         "key": "destroy",
         "description": "Destroy this",
         "action": {"type": "shape_action", "name": "destroy"},
-        "user_vars": ["shape"]
+        "user_vars": [],
+        "vars": ["shape"]
     },
 
     "morph_into": {
         "key": "morph_into",
         "description": "Morph this into {a}",
         "action": {"type": "shape_action", "name": "morph"},
-        "user_vars": ["shape", "shape_type"]
+        "user_vars": ["shape_type"],
+        "vars": ["shape", "shape_type"]
     },
 
-    "change_gravity": {
-        "key": "change_gravity",
-        "description": "Change gravity to {a}",
-        "action": {"type": "global_action", "name": "change_gravity"},
-        "user_vars": ["shape", "variable"]
+    "change_x_gravity": {
+        "key": "change_x_gravity",
+        "description": "Change X gravity to {a}",
+        "action": {"type": "global_action", "name": "change_x_gravity"},
+        "user_vars": ["variable"],
+        "vars": ["variable"]
+    },
+
+    "change_y_gravity": {
+        "key": "change_y_gravity",
+        "description": "Change Y gravity to {a}",
+        "action": {"type": "global_action", "name": "change_y_gravity"},
+        "user_vars": ["variable"],
+        "vars": ["variable"]
     },
 
     "spawn": {
         "key": "spawn",
         "description": "Spawn {a}",
         "action": {"type": "global_action", "name": "spawn"},
-        "user_vars": ["shape_type"]
+        "user_vars": ["shape_type"],
+        "vars": ["shape_type"]
     }
 }
 

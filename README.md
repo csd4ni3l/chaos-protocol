@@ -1,2 +1,4 @@
 Chaos Protocol is a simulation game where you have a rule engine and objects, which you can apply rules to! By default, the game launches with random rules.
 Basically a framework of sorts, which can even be random!
+
+The project is a huge WIP! You can't do much yet, but you have basic rules and simulation.

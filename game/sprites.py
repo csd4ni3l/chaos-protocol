@@ -1,4 +1,4 @@
-import pyglet
+import pyglet, arcade.color
 
 from utils.constants import DEFAULT_X_VELOCITY, DEFAULT_Y_VELOCITY
 
@@ -7,11 +7,22 @@ class BaseShape():
         self.shape_type = ""
         self.x_velocity = DEFAULT_X_VELOCITY
         self.y_velocity = DEFAULT_Y_VELOCITY
+        self._shape_color = "WHITE"
 
-    def update(self, gravity):
+    def update(self, x_gravity, y_gravity):
         self.x += self.x_velocity
         self.y += self.y_velocity
-        self.y -= gravity
+        self.x -= x_gravity
+        self.y -= y_gravity
+
+    @property
+    def shape_color(self):
+        return self._shape_color
+    
+    @shape_color.setter
+    def shape_color(self, color):
+        self._shape_color = color
+        self.color = getattr(arcade.color, color)
 
 class Circle(pyglet.shapes.Circle, BaseShape):
     def __init__(self, *args, **kwargs):
@@ -41,4 +52,4 @@ class Triangle(pyglet.shapes.Triangle, BaseShape):
 
     @property
     def shape_size(self):
-        return self.x2 - self.x
+        return max(self.x, self.x2, self.x3) - min(self.x, self.x2, self.x3)
