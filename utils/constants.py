@@ -13,7 +13,7 @@ DEFAULT_Y_GRAVITY = 2
 DEFAULT_X_VELOCITY = 0
 DEFAULT_Y_VELOCITY = 0
 
-ALLOWED_INPUT = [ord(key) for key in ["a", "b", "c", "d", "e", "q", "w", "s", "t"]]
+ALLOWED_INPUT = ["a", "b", "c", "d", "e", "q", "w", "s", "t"]
 
 COLORS = [
     "BLACK", "WHITE", "GRAY", "DARK_GRAY", "CYAN", 

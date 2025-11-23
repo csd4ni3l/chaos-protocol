@@ -8,10 +8,10 @@ DO_KEYS = tuple(DO_RULES.keys())
 BAD_WHEN = {tuple(sorted(pair)) for pair in NON_COMPATIBLE_WHEN}
 BAD_DO_WHEN = {tuple(pair) for pair in NON_COMPATIBLE_DO_WHEN}
 
-def generate_rule():
+def generate_ruleset(ruleset_type):
     when_a = random.choice(IF_KEYS)
 
-    if random.random() < 0.5:
+    if ruleset_type == "advanced":
         valid_b = [
             b for b in IF_KEYS
             if b != when_a and tuple(sorted((when_a, b))) not in BAD_WHEN
