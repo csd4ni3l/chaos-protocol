@@ -1,7 +1,7 @@
-import arcade, arcade.gui, pyglet, random
+import arcade, arcade.gui, pyglet, random, json
 
 from utils.preload import SPRITE_TEXTURES
-from utils.constants import slider_style, dropdown_style, VAR_NAMES, VAR_DEFAULT, DEFAULT_X_GRAVITY, DEFAULT_Y_GRAVITY, VAR_OPTIONS, DO_RULES, IF_RULES, SHAPES, ALLOWED_INPUT
+from utils.constants import slider_style, dropdown_style, VAR_NAMES, VAR_DEFAULT, VAR_OPTIONS, DO_RULES, IF_RULES, SHAPES, ALLOWED_INPUT
 
 from game.rules import generate_ruleset
 from game.sprites import BaseShape, Rectangle, Circle, Triangle
@@ -13,6 +13,9 @@ class Game(arcade.gui.UIView):
         self.pypresence_client = pypresence_client
         self.pypresence_client.update(state="Causing Chaos")
 
+        with open("settings.json", "r") as file:
+            self.settings = json.load(file)
+
         self.anchor = self.add_widget(arcade.gui.UIAnchorLayout(size_hint=(1, 1)))
 
         self.rules_box = arcade.gui.UIBoxLayout(align="center", size_hint=(0.25, 0.95)).with_background(color=arcade.color.DARK_GRAY)
@@ -20,8 +23,8 @@ class Game(arcade.gui.UIView):
 
         self.sprites_box = self.anchor.add(arcade.gui.UIBoxLayout(size_hint=(0.15, 0.95), align="center", space_between=10).with_background(color=arcade.color.DARK_GRAY), anchor_x="left", anchor_y="center", align_x=self.window.height * 0.025)
 
-        self.x_gravity = DEFAULT_X_GRAVITY
-        self.y_gravity = DEFAULT_Y_GRAVITY
+        self.x_gravity = self.settings.get("default_x_gravity", 0)
+        self.y_gravity = self.settings.get("default_y_gravity", 5)
 
         self.current_ruleset_num = 0
         self.current_ruleset_page = 0
@@ -39,6 +42,7 @@ class Game(arcade.gui.UIView):
 
         self.rules_content_box = None
         self.nav_buttons_box = None
+
 
     def move_x(self, a, shape):
         if isinstance(shape, Triangle):
@@ -80,11 +84,11 @@ class Game(arcade.gui.UIView):
 
     def change_x_velocity(self, a, shape):
         shape.x_velocity = a
-        self.triggered_events.append(["x_velocity_change", {"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.color}])
+        self.triggered_events.append(["x_velocity_change", {"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.shape_color}])
 
     def change_y_velocity(self, a, shape):
         shape.y_velocity = a
-        self.triggered_events.append(["y_velocity_change", {"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.color}])
+        self.triggered_events.append(["y_velocity_change", {"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.shape_color}])
 
     def change_x_gravity(self, a):
         self.x_gravity = a
@@ -95,8 +99,8 @@ class Game(arcade.gui.UIView):
         self.triggered_events.append(["y_gravity_change", {}])
 
     def change_color(self, a, shape):
-        shape.color = getattr(arcade.color, a)
-        self.triggered_events.append(["color_change", {"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.color}])
+        shape.shape_color = getattr(arcade.color, a)
+        self.triggered_events.append(["color_change", {"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.shape_color}])
 
     def destroy(self, shape: BaseShape):
         self.triggered_events.append(["destroyed", {"event_shape_type": shape.shape_type}])
@@ -122,7 +126,7 @@ class Game(arcade.gui.UIView):
             shape.x3 += size
             shape.y3 += size
 
-        self.triggered_events.append(["size_change", {"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.color}])
+        self.triggered_events.append(["size_change", {"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.shape_color}])
 
     def spawn(self, shape_type):
         x, y = random.randint(int(self.window.width * 0.15) + 50, int(self.window.width * 0.75) - 50), random.randint(100, self.window.height - 100)
@@ -138,7 +142,7 @@ class Game(arcade.gui.UIView):
 
         shape = self.shapes[-1]
 
-        self.triggered_events.append(["spawns", {"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.color}])
+        self.triggered_events.append(["spawn", {"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.shape_color}])
 
     def morph(self, a, shape):
         old_shape_x, old_shape_y, old_shape_size, old_shape_color = shape.x, shape.y, shape.shape_size, shape.shape_color
@@ -310,6 +314,14 @@ class Game(arcade.gui.UIView):
         add_advanced_rule_button = self.rules_box.add(arcade.gui.UIFlatButton(text="Add Advanced rule", width=self.window.width * 0.225, height=self.window.height / 25, style=dropdown_style))
         add_advanced_rule_button.on_click = lambda event: self.add_rule("advanced")
 
+        self.rules_box.add(arcade.gui.UISpace(height=self.window.height / 85))
+
+        self.rules_box.add(arcade.gui.UIFlatButton(text="Load from file\ncomming soon!", multiline=True, width=self.window.width * 0.225, height=self.window.height / 22.5, style=dropdown_style))
+     
+        self.rules_box.add(arcade.gui.UISpace(height=self.window.height / 85))
+
+        self.rules_box.add(arcade.gui.UIFlatButton(text="Save to file\ncomming soon!", multiline=True, width=self.window.width * 0.225, height=self.window.height / 22.5, style=dropdown_style))
+
         self.rules_box.add(arcade.gui.UISpace(height=self.window.height / 70))
 
         self.nav_buttons_box = self.rules_box.add(arcade.gui.UIBoxLayout(vertical=False, space_between=10))
@@ -332,6 +344,10 @@ class Game(arcade.gui.UIView):
         for shape in SHAPES:
             self.sprites_box.add(arcade.gui.UILabel(text=shape, font_size=16, text_color=arcade.color.BLACK))
             self.sprites_box.add(arcade.gui.UIImage(texture=SPRITE_TEXTURES[shape], width=self.window.width / 15, height=self.window.width / 15))
+
+        self.sprites_box.add(arcade.gui.UISpace(height=self.window.height / 50))
+
+        self.sprites_box.add(arcade.gui.UIFlatButton(text="Load sprite\ncomming soon!", multiline=True, style=dropdown_style, width=self.window.width * 0.125, height=self.window.height / 10))
 
         self.triggered_events.append(["game_launch", {}])
 
@@ -393,7 +409,7 @@ class Game(arcade.gui.UIView):
                         for shape in self.shapes:                            
                             event_args = trigger_args.copy()
                             if not "event_shape_type" in trigger_args:
-                                event_args.update({"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.color})
+                                event_args.update({"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.shape_color})
 
                             if self.check_rule(key, 1, if_rule_dict, event_args):
                                 self.run_do_rule(key, 2, do_rule_dict, event_args)
@@ -414,7 +430,7 @@ class Game(arcade.gui.UIView):
                             event_args = trigger_args
                             
                             if not "event_shape_type" in trigger_args:
-                                event_args.update({"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.color})
+                                event_args.update({"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.shape_color})
 
                             if ruleset[1] == "and":
                                 if self.check_rule(key, 1, if_rule_dicts[0], event_args) and self.check_rule(key, 2, if_rule_dicts[1], event_args):
@@ -434,9 +450,17 @@ class Game(arcade.gui.UIView):
                                 self.run_do_rule(key, 3, do_rule_dict, event_args)
 
         for shape in self.shapes:
+            for shape_b in self.shapes:
+                if shape.check_collision(shape_b):
+                    self.triggered_events.append(["collision", {"event_a_type": shape.shape_type, "event_b_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.color}])
+
             shape.update(self.x_gravity, self.y_gravity)
 
             if shape.x < 0 or shape.x > self.window.width or shape.y < 0 or shape.y > self.window.height:
+                self.destroy(shape)
+
+        if len(self.shapes) > self.settings.get("max_shapes", 120):
+            for shape in self.shapes[:-self.settings.get("max_shapes", 120)]:
                 self.destroy(shape)
 
     def change_rule_value(self, ruleset_num, rule_num, rule, rule_type, variable_type, n, value):

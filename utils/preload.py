@@ -12,3 +12,5 @@ SPRITE_TEXTURES = {
     "rectangle": arcade.load_texture(os.path.join(_assets_dir, 'graphics', 'sprites', 'rectangle.png')),
     "triangle": arcade.load_texture(os.path.join(_assets_dir, 'graphics', 'sprites', 'triangle.png')),
 }
+
+theme_sound = arcade.Sound(os.path.join(_assets_dir, 'sound', 'music.ogg'))

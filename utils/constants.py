@@ -7,12 +7,6 @@ LOGICAL_OPERATORS = ["and", "or"]
 SHAPES = ["rectangle", "circle", "triangle"]
 VAR_NAMES = ["a", "b", "c", "d", "e", "f", "g"]
 
-DEFAULT_X_GRAVITY = 0
-DEFAULT_Y_GRAVITY = 2
-
-DEFAULT_X_VELOCITY = 0
-DEFAULT_Y_VELOCITY = 0
-
 ALLOWED_INPUT = ["a", "b", "c", "d", "e", "q", "w", "s", "t"]
 
 COLORS = [
@@ -82,7 +76,7 @@ IF_RULES = {
     "spawns": {
         "key": "spawns",
         "description": "IF {a} shape spawns",
-        "trigger": "spawns",
+        "trigger": "spawn",
         "user_vars": ["shape_type"],
         "vars": ["shape_type", "event_shape_type"],
         "func": lambda *v: v[0] == v[1]
@@ -107,22 +101,6 @@ IF_RULES = {
         "key": "y_velocity_changes",
         "description": "IF {a} shape Y velocity changes",
         "trigger": "y_velocity_change",
-        "user_vars": ["shape_type"],
-        "vars": ["shape_type", "event_shape_type"],
-        "func": lambda *v: v[0] == v[1]
-    },
-    "x_gravity_changes": {
-        "key": "x_gravity_changes",
-        "description": "IF {a} shape X gravity changes",
-        "trigger": "gravity_x_change",
-        "user_vars": ["shape_type"],
-        "vars": ["shape_type", "event_shape_type"],
-        "func": lambda *v: v[0] == v[1]
-    },
-    "y_gravity_changes": {
-        "key": "y_gravity_changes",
-        "description": "IF {a} shape Y gravity changes",
-        "trigger": "gravity_y_change",
         "user_vars": ["shape_type"],
         "vars": ["shape_type", "event_shape_type"],
         "func": lambda *v: v[0] == v[1]
@@ -438,16 +416,21 @@ slider_style = {'normal': slider_default_style, 'hover': slider_hover_style, 'pr
 settings = {
     "Graphics": {
         "Window Mode": {"type": "option", "options": ["Windowed", "Fullscreen", "Borderless"], "config_key": "window_mode", "default": "Windowed"},
-        "Resolution": {"type": "option", "options": ["1366x768", "1440x900", "1600x900", "1920x1080", "2560x1440", "3840x2160"], "config_key": "resolution"},
+        "Resolution": {"type": "option", "options": ["1440x900", "1600x900", "1920x1080", "2560x1440", "3840x2160"], "config_key": "resolution"},
         "Anti-Aliasing": {"type": "option", "options": ["None", "2x MSAA", "4x MSAA", "8x MSAA", "16x MSAA"], "config_key": "anti_aliasing", "default": "4x MSAA"},
         "VSync": {"type": "bool", "config_key": "vsync", "default": True},
         "FPS Limit": {"type": "slider", "min": 0, "max": 480, "config_key": "fps_limit", "default": 60},
     },
     "Sound": {
         "Music": {"type": "bool", "config_key": "music", "default": True},
-        "SFX": {"type": "bool", "config_key": "sfx", "default": True},
         "Music Volume": {"type": "slider", "min": 0, "max": 100, "config_key": "music_volume", "default": 50},
-        "SFX Volume": {"type": "slider", "min": 0, "max": 100, "config_key": "sfx_volume", "default": 50},
+    },
+    "Game": {
+        "Default X velocity": {"type": "slider", "min": -999, "max": 999, "config_key": "default_x_velocity", "default": 0},
+        "Default Y velocity": {"type": "slider", "min": -999, "max": 999, "config_key": "default_y_velocity", "default": 0},
+        "Default X gravity": {"type": "slider", "min": -999, "max": 999, "config_key": "default_x_gravity", "default": 0},
+        "Default Y gravity": {"type": "slider", "min": -999, "max": 999, "config_key": "default_y_gravity", "default": 5},
+        "Max Shapes": {"type": "slider", "min": 0, "max": 999, "config_key": "max_shapes", "default": 120},
     },
     "Miscellaneous": {
         "Discord RPC": {"type": "bool", "config_key": "discord_rpc", "default": True},
