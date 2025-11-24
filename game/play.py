@@ -28,7 +28,7 @@ class Game(arcade.gui.UIView):
 
         self.current_ruleset_num = 0
         self.current_ruleset_page = 0
-        self.rulesets_per_page = 3
+        self.rulesets_per_page = 1
         self.rulesets = {}
         self.rule_values = {}
         self.triggered_events = []
