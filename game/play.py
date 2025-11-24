@@ -3,8 +3,6 @@ import arcade, arcade.gui, pyglet, random
 from utils.preload import SPRITE_TEXTURES
 from utils.constants import slider_style, dropdown_style, VAR_NAMES, VAR_DEFAULT, DEFAULT_X_GRAVITY, DEFAULT_Y_GRAVITY, VAR_OPTIONS, DO_RULES, IF_RULES, SHAPES, ALLOWED_INPUT
 
-from arcade.gui.experimental.scroll_area import UIScrollArea, UIScrollBar
-
 from game.rules import generate_ruleset
 from game.sprites import BaseShape, Rectangle, Circle, Triangle
 
@@ -17,23 +15,17 @@ class Game(arcade.gui.UIView):
 
         self.anchor = self.add_widget(arcade.gui.UIAnchorLayout(size_hint=(1, 1)))
 
-        self.scroll_area = UIScrollArea(size_hint=(0.25, 1))
-        self.scroll_area.scroll_speed = -75
-        self.anchor.add(self.scroll_area, anchor_x="right", anchor_y="bottom", align_x=-self.window.width * 0.02)
+        self.rules_box = arcade.gui.UIBoxLayout(align="center", size_hint=(0.25, 0.95)).with_background(color=arcade.color.DARK_GRAY)
+        self.anchor.add(self.rules_box, anchor_x="right", anchor_y="center", align_x=-self.window.height * 0.025)
 
-        self.scrollbar = UIScrollBar(self.scroll_area)
-        self.scrollbar.size_hint = (0.02, 1)
-        self.anchor.add(self.scrollbar, anchor_x="right", anchor_y="center")
-
-        self.rules_box = arcade.gui.UIBoxLayout(align="center", size_hint=(0.25, 1)).with_background(color=arcade.color.DARK_GRAY)
-        self.scroll_area.add(self.rules_box)
-
-        self.sprites_box = self.anchor.add(arcade.gui.UIBoxLayout(size_hint=(0.15, 1), align="center", space_between=10).with_background(color=arcade.color.DARK_GRAY), anchor_x="left", anchor_y="bottom")
+        self.sprites_box = self.anchor.add(arcade.gui.UIBoxLayout(size_hint=(0.15, 0.95), align="center", space_between=10).with_background(color=arcade.color.DARK_GRAY), anchor_x="left", anchor_y="center", align_x=self.window.height * 0.025)
 
         self.x_gravity = DEFAULT_X_GRAVITY
         self.y_gravity = DEFAULT_Y_GRAVITY
 
         self.current_ruleset_num = 0
+        self.current_ruleset_page = 0
+        self.rulesets_per_page = 3
         self.rulesets = {}
         self.rule_values = {}
         self.triggered_events = []
@@ -44,6 +36,9 @@ class Game(arcade.gui.UIView):
 
         self.shapes = []
         self.shape_batch = pyglet.graphics.Batch()
+
+        self.rules_content_box = None
+        self.nav_buttons_box = None
 
     def move_x(self, a, shape):
         if isinstance(shape, Triangle):
@@ -130,7 +125,7 @@ class Game(arcade.gui.UIView):
         self.triggered_events.append(["size_change", {"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.color}])
 
     def spawn(self, shape_type):
-        x, y = random.randint(self.window.width * 0.15 + 50, self.window.width * 0.75 - 50), random.randint(100, self.window.height - 100)
+        x, y = random.randint(int(self.window.width * 0.15) + 50, int(self.window.width * 0.75) - 50), random.randint(100, self.window.height - 100)
 
         if shape_type == "circle":
             self.shapes.append(Circle(x, y, 10, color=arcade.color.WHITE, batch=self.shape_batch))
@@ -162,7 +157,7 @@ class Game(arcade.gui.UIView):
         if rule_type == "if":
             return {
                     rule_key: (
-                        rule_dict["description"].format_map({VAR_NAMES[n]: VAR_DEFAULT[variable] for n, variable in enumerate(rule_dict["user_vars"])}), 
+                        rule_dict["description"].format_map({VAR_NAMES[n]: VAR_NAMES[n] for n, variable in enumerate(rule_dict["user_vars"])}), 
                         {VAR_NAMES[n]: VAR_DEFAULT[variable] for n, variable in enumerate(rule_dict["user_vars"])}
                     ) 
                     for rule_key, rule_dict in IF_RULES.items()
@@ -170,7 +165,7 @@ class Game(arcade.gui.UIView):
         elif rule_type == "do":
             return {
                     rule_key: (
-                        rule_dict["description"].format_map({VAR_NAMES[n]: VAR_DEFAULT[variable] for n, variable in enumerate(rule_dict["user_vars"])}), 
+                        rule_dict["description"].format_map({VAR_NAMES[n]: VAR_NAMES[n] for n, variable in enumerate(rule_dict["user_vars"])}), 
                         {VAR_NAMES[n]: VAR_DEFAULT[variable] for n, variable in enumerate(rule_dict["user_vars"])}
                     ) 
                     for rule_key, rule_dict in DO_RULES.items()
@@ -191,17 +186,17 @@ class Game(arcade.gui.UIView):
 
             self.rule_values[key] = default_values[VAR_NAMES[n]]
 
-            label = rule_box.add(arcade.gui.UILabel(f'{VAR_NAMES[n]}: {default_values[VAR_NAMES[n]]}', font_size=11, width=self.window.width * 0.225, height=self.window.height / 25))
+            label = rule_box.add(arcade.gui.UILabel(f'{VAR_NAMES[n]}: {default_values[VAR_NAMES[n]]}', font_size=11, width=self.window.width * 0.225, height=self.window.height / 30))
             self.rule_labels[key] = label
 
             if variable_type in ["variable", "size"]: 
-                slider = rule_box.add(arcade.gui.UISlider(value=default_values[VAR_NAMES[n]], min_value=VAR_OPTIONS[variable_type][0], max_value=VAR_OPTIONS[variable_type][1], step=1, style=slider_style, width=self.window.width * 0.225, height=self.window.height / 25))
+                slider = rule_box.add(arcade.gui.UISlider(value=default_values[VAR_NAMES[n]], min_value=VAR_OPTIONS[variable_type][0], max_value=VAR_OPTIONS[variable_type][1], step=1, style=slider_style, width=self.window.width * 0.225, height=self.window.height / 30))
                 slider._render_steps = lambda surface: None  
                 slider.on_change = lambda event, variable_type=variable_type, rule=rule, rule_type=rule_type, ruleset_num=ruleset_num, rule_num=rule_num, n=n: self.change_rule_value(ruleset_num, rule_num, rule, rule_type, variable_type, n, event.new_value)
                 self.rule_var_changers[key] = slider
 
-            elif variable_type in ["shape_type", "target_type", "color", "key_input"]:
-                dropdown = rule_box.add(arcade.gui.UIDropdown(default=default_values[VAR_NAMES[n]], options=VAR_OPTIONS[variable_type], active_style=dropdown_style, primary_style=dropdown_style, dropdown_style=dropdown_style, width=self.window.width * 0.225, height=self.window.height / 25))
+            else:
+                dropdown = rule_box.add(arcade.gui.UIDropdown(default=default_values[VAR_NAMES[n]], options=VAR_OPTIONS[variable_type], active_style=dropdown_style, primary_style=dropdown_style, dropdown_style=dropdown_style, width=self.window.width * 0.225, height=self.window.height / 30))
                 dropdown.on_change = lambda event, variable_type=variable_type, rule=rule, rule_type=rule_type, ruleset_num=ruleset_num, rule_num=rule_num, n=n: self.change_rule_value(ruleset_num, rule_num, rule, rule_type, variable_type, n, event.new_value)
                 self.rule_var_changers[key] = dropdown
 
@@ -260,7 +255,7 @@ class Game(arcade.gui.UIView):
         self.current_ruleset_num = old_ruleset_num
 
     def add_ruleset(self, ruleset):
-        rule_box = self.rules_box.add(arcade.gui.UIBoxLayout(space_between=5, align="left").with_background(color=arcade.color.DARK_SLATE_GRAY))
+        rule_box = arcade.gui.UIBoxLayout(space_between=5, align="left").with_background(color=arcade.color.DARK_SLATE_GRAY)
         self.rule_boxes[self.current_ruleset_num] = rule_box
 
         if len(ruleset) == 2:
@@ -275,28 +270,61 @@ class Game(arcade.gui.UIView):
             self.create_rule_ui(rule_box, ruleset[0], "if")
             rule_box.add(arcade.gui.UILabel(ruleset[1].upper(), font_size=14, width=self.window.width * 0.25))
             self.create_rule_ui(rule_box, ruleset[2], "if", 2)
-            self.create_rule_ui(rule_box, ruleset[3], "do", 3)                
+            self.create_rule_ui(rule_box, ruleset[3], "do", 3)
 
-        self.rules_box.add(arcade.gui.UISpace(height=self.window.height / 50))
-        
+    def refresh_rules_display(self):
+        self.rules_content_box.clear()
+
+        sorted_keys = sorted(self.rule_boxes.keys())
+        start_idx = self.current_ruleset_page * self.rulesets_per_page
+        end_idx = start_idx + self.rulesets_per_page
+        visible_keys = sorted_keys[start_idx:end_idx]
+
+        for key in visible_keys:
+            self.rules_content_box.add(self.rule_boxes[key])
+            self.rules_content_box.add(arcade.gui.UISpace(height=self.window.height / 50))
+
+    def next_page(self, event):
+        sorted_keys = sorted(self.rule_boxes.keys())
+        max_page = (len(sorted_keys) - 1) // self.rulesets_per_page
+        if self.current_ruleset_page < max_page:
+            self.current_ruleset_page += 1
+            self.refresh_rules_display()
+
+    def prev_page(self, event):
+        if self.current_ruleset_page > 0:
+            self.current_ruleset_page -= 1
+            self.refresh_rules_display()
+
     def on_show_view(self):
         super().on_show_view()
 
-        self.rules_box.add(arcade.gui.UILabel(text="Rules", font_size=24, text_color=arcade.color.BLACK))
-        self.rules_box.add(arcade.gui.UISpace(height=self.window.height / 50, width=self.window.width * 0.25))
+        self.rules_box.add(arcade.gui.UILabel(text="Rules", font_size=20, text_color=arcade.color.BLACK))
+        self.rules_box.add(arcade.gui.UISpace(height=self.window.height / 70, width=self.window.width * 0.25))
 
-        add_simple_rule_button = self.rules_box.add(arcade.gui.UIFlatButton(text="Add Simple rule", width=self.window.width * 0.225, height=self.window.height / 15, style=dropdown_style))
+        add_simple_rule_button = self.rules_box.add(arcade.gui.UIFlatButton(text="Add Simple rule", width=self.window.width * 0.225, height=self.window.height / 25, style=dropdown_style))
         add_simple_rule_button.on_click = lambda event: self.add_rule("simple")
 
-        self.rules_box.add(arcade.gui.UISpace(height=self.window.height / 75))
+        self.rules_box.add(arcade.gui.UISpace(height=self.window.height / 85))
 
-        add_advanced_rule_button = self.rules_box.add(arcade.gui.UIFlatButton(text="Add Advanced rule", width=self.window.width * 0.225, height=self.window.height / 15, style=dropdown_style))
+        add_advanced_rule_button = self.rules_box.add(arcade.gui.UIFlatButton(text="Add Advanced rule", width=self.window.width * 0.225, height=self.window.height / 25, style=dropdown_style))
         add_advanced_rule_button.on_click = lambda event: self.add_rule("advanced")
 
-        self.rules_box.add(arcade.gui.UISpace(height=self.window.height / 50))
+        self.rules_box.add(arcade.gui.UISpace(height=self.window.height / 70))
+
+        self.nav_buttons_box = self.rules_box.add(arcade.gui.UIBoxLayout(vertical=False, space_between=10))
+        prev_button = self.nav_buttons_box.add(arcade.gui.UIFlatButton(text="Previous", width=self.window.width * 0.1, height=self.window.height / 25, style=dropdown_style))
+        prev_button.on_click = self.prev_page
+        next_button = self.nav_buttons_box.add(arcade.gui.UIFlatButton(text="Next", width=self.window.width * 0.1, height=self.window.height / 25, style=dropdown_style))
+        next_button.on_click = self.next_page
+
+        self.rules_box.add(arcade.gui.UISpace(height=self.window.height / 70))
+
+        self.rules_content_box = self.rules_box.add(arcade.gui.UIBoxLayout(align="center"))
 
         self.add_rule(None, ["on_left_click", "spawn"])
-        self.add_rule(None, ["size_greater", "morph_into"])
+
+        self.refresh_rules_display()
 
         self.sprites_box.add(arcade.gui.UILabel(text="Sprites", font_size=24, text_color=arcade.color.BLACK))
         self.sprites_box.add(arcade.gui.UISpace(height=self.window.height / 50))
@@ -311,6 +339,8 @@ class Game(arcade.gui.UIView):
         self.rulesets[self.current_ruleset_num] = generate_ruleset(ruleset_type) if not force else force
         self.add_ruleset(self.rulesets[self.current_ruleset_num])
         self.current_ruleset_num += 1
+        if self.rules_content_box:
+            self.refresh_rules_display()
 
     def get_rule_values(self, ruleset_num, rule_num, rule_dict, event_args):
         args = [self.rule_values[f"{ruleset_num}_{rule_num}_{user_var}_{n}"] for n, user_var in enumerate(rule_dict["user_vars"])]

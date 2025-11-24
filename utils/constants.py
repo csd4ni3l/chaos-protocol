@@ -29,13 +29,16 @@ COLORS = [
     "MINT_GREEN", "CHARTREUSE"
 ]
 
+COMPARISONS = [">", ">=", "<", "<=", "==", "!="]
+
 VAR_DEFAULT = {
     "shape_type": SHAPES[0],
     "target_type": SHAPES[1],
     "variable": 0,
     "color": "WHITE",
     "size": 10,
-    "key_input": ALLOWED_INPUT[0]
+    "key_input": ALLOWED_INPUT[0],
+    "comparison": COMPARISONS[0]
 }
 
 VAR_OPTIONS = {
@@ -44,83 +47,36 @@ VAR_OPTIONS = {
     "variable": (-700, 700),
     "color": COLORS,
     "size": (1, 200),
-    "key_input": ALLOWED_INPUT
+    "key_input": ALLOWED_INPUT,
+    "comparison": COMPARISONS
 }
 
 IF_RULES = {
-    "x_position_greater": {
-        "key": "x_position_greater",
-        "description": "IF X for {a} shape is greater than {b}",
+    "x_position_compare": {
+        "key": "x_position_compare",
+        "description": "IF X for {a} shape is {b} {c}",
         "trigger": "every_update",
-        "user_vars": ["shape_type", "variable"],
-        "vars": ["shape_type", "variable", "event_shape_type", "shape_x"],
-        "func": lambda *v: (v[0] == v[2]) and (v[3] > v[1])
-    },
-    "x_position_less": {
-        "key": "x_position_less",
-        "description": "IF X for {a} shape is less than {b}",
-        "trigger": "every_update",
-        "user_vars": ["shape_type", "variable"],
-        "vars": ["shape_type", "variable", "event_shape_type", "shape_x"],
-        "func": lambda *v: (v[0] == v[2]) and (v[3] < v[1])
-    },
-    "x_position_between": {
-        "key": "x_position_between",
-        "description": "IF X for {a} shape is between {b} and {c}",
-        "trigger": "every_update",
-        "user_vars": ["shape_type", "variable", "variable"],
-        "vars": ["shape_type", "variable", "variable", "event_shape_type", "shape_x"],
-        "func": lambda *v: (v[0] == v[3]) and (min(v[1], v[2]) <= v[4] <= max(v[1], v[2]))
+        "user_vars": ["shape_type", "comparison", "variable"],
+        "vars": ["shape_type", "comparison", "variable", "event_shape_type", "shape_x"],
+        "func": lambda *v: (v[0] == v[3]) and eval(f"{v[4]} {v[1]} {v[2]}")
     },
     
-    "y_position_greater": {
-        "key": "y_position_greater",
-        "description": "IF Y for {a} shape is greater than {b}",
+    "y_position_compare": {
+        "key": "y_position_compare",
+        "description": "IF Y for {a} shape is {b} {c}",
         "trigger": "every_update",
-        "user_vars": ["shape_type", "variable"],
-        "vars": ["shape_type", "variable", "event_shape_type", "shape_y"],
-        "func": lambda *v: (v[0] == v[2]) and (v[3] > v[1])
-    },
-    "y_position_less": {
-        "key": "y_position_less",
-        "description": "IF Y for {a} shape is less than {b}",
-        "trigger": "every_update",
-        "user_vars": ["shape_type", "variable"],
-        "vars": ["shape_type", "variable", "event_shape_type", "shape_y"],
-        "func": lambda *v: (v[0] == v[2]) and (v[3] < v[1])
-    },
-    "y_position_between": {
-        "key": "y_position_between",
-        "description": "IF Y for {a} shape is between {b} and {c}",
-        "trigger": "every_update",
-        "user_vars": ["shape_type", "variable", "variable"],
-        "vars": ["shape_type", "variable", "variable", "event_shape_type", "shape_y"],
-        "func": lambda *v: (v[0] == v[3]) and (min(v[1], v[2]) <= v[4] <= max(v[1], v[2]))
+        "user_vars": ["shape_type", "comparison", "variable"],
+        "vars": ["shape_type", "comparison", "variable", "event_shape_type", "shape_y"],
+        "func": lambda *v: (v[0] == v[3]) and eval(f"{v[4]} {v[1]} {v[2]}")
     },
     
-    "size_greater": {
-        "key": "size_greater",
-        "description": "IF {a} shape size is greater than {b}",
+    "size_compare": {
+        "key": "size_compare",
+        "description": "IF {a} shape size is {b} {c}",
         "trigger": "every_update",
-        "user_vars": ["shape_type", "variable"],
-        "vars": ["shape_type", "variable", "event_shape_type", "shape_size"],
-        "func": lambda *v: (v[0] == v[2]) and (v[3] > v[1])
-    },
-    "size_less": {
-        "key": "size_less",
-        "description": "IF {a} shape size is less than {b}",
-        "trigger": "every_update",
-        "user_vars": ["shape_type", "variable"],
-        "vars": ["shape_type", "variable", "event_shape_type", "shape_size"],
-        "func": lambda *v: (v[0] == v[2]) and (v[3] < v[1])
-    },
-    "size_between": {
-        "key": "size_between",
-        "description": "IF {a} shape size is between {b} and {c}",
-        "trigger": "every_update",
-        "user_vars": ["shape_type", "variable", "variable"],
-        "vars": ["shape_type", "variable", "variable", "event_shape_type", "shape_size"],
-        "func": lambda *v: (v[0] == v[3]) and (min(v[1], v[2]) <= v[4] <= max(v[1], v[2]))
+        "user_vars": ["shape_type", "comparison", "variable"],
+        "vars": ["shape_type", "comparison", "variable", "event_shape_type", "shape_size"],
+        "func": lambda *v: (v[0] == v[3]) and eval(f"{v[4]} {v[1]} {v[2]}")
     },
     
     "spawns": {
