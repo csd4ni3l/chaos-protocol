@@ -7,7 +7,7 @@ from arcade.gui.experimental.scroll_area import UIScrollArea, UIScrollBar
 
 class FileManager(arcade.gui.UIAnchorLayout):
     def __init__(self, width, allowed_extensions):
-        super().__init__(size_hint=(0.95, 0.9), vertical=False)
+        super().__init__(size_hint=(0.95, 0.875), vertical=False)
 
         self.filemanager_width = width
 
@@ -20,11 +20,11 @@ class FileManager(arcade.gui.UIAnchorLayout):
         self.content_cache = {}
         self.pre_cache_contents()
 
-        self.current_directory_label = self.add(arcade.gui.UILabel(text=self.current_directory, font_name="Roboto", font_size=24), anchor_x="center", anchor_y="top", align_y=-5)
+        self.current_directory_label = self.add(arcade.gui.UILabel(text=self.current_directory, font_name="Roboto", font_size=22), anchor_x="center", anchor_y="top", align_y=-10)
 
         self.scroll_area = UIScrollArea(size_hint=(0.665, 0.7)) # center on screen
         self.scroll_area.scroll_speed = -50
-        self.add(self.scroll_area, anchor_x="center", anchor_y="center", align_y=self.filemanager_width * 0.05)
+        self.add(self.scroll_area, anchor_x="center", anchor_y="center", align_y=self.filemanager_width * 0.025)
 
         self.scrollbar = UIScrollBar(self.scroll_area)
         self.scrollbar.size_hint = (0.02, 1)
@@ -33,20 +33,17 @@ class FileManager(arcade.gui.UIAnchorLayout):
         self.files_box = arcade.gui.UIBoxLayout(space_between=5)
         self.scroll_area.add(self.files_box)
 
-        self.bottom_box = self.add(arcade.gui.UIBoxLayout(space_between=10), anchor_x="center", anchor_y="bottom", align_y=10)
+        self.bottom_box = self.add(arcade.gui.UIBoxLayout(space_between=5), anchor_x="center", anchor_y="bottom", align_y=5)
 
-        self.filename_label = self.bottom_box.add(arcade.gui.UILabel(text="Filename:", font_name="Roboto", font_size=20))
-        self.filename_input = self.bottom_box.add(arcade.gui.UIInputText(width=self.filemanager_width * 0.35, height=self.filemanager_width * 0.025).with_border(color=arcade.color.WHITE))
-        self.submit_button = self.bottom_box.add(arcade.gui.UITextureButton(texture=button_texture, texture_hovered=button_hovered_texture, text="Submit", style=button_style, width=self.filemanager_width * 0.2, height=self.filemanager_width * 0.05))
+        self.filename_label = self.bottom_box.add(arcade.gui.UILabel(text="Filename:", font_name="Roboto", font_size=17))
+        self.filename_input = self.bottom_box.add(arcade.gui.UIInputText(width=self.filemanager_width * 0.35, height=self.filemanager_width * 0.02).with_border(color=arcade.color.WHITE))
+        
+        self.submit_button = self.bottom_box.add(arcade.gui.UITextureButton(texture=button_texture, texture_hovered=button_hovered_texture, text="Submit", style=button_style, width=self.filemanager_width * 0.5, height=self.filemanager_width * 0.025))
         self.submit_button.on_click = lambda event: self.submit(self.current_directory)
 
         self.submit_button.visible = False
         self.filename_label.visible = False
         self.filename_input.visible = False
-
-        self.back_button = arcade.gui.UITextureButton(texture=button_texture, texture_hovered=button_hovered_texture, text='<--', style=button_style, width=100, height=50)
-        self.back_button.on_click = lambda event: self.exit()
-        self.add(self.back_button, anchor_x="left", anchor_y="top", align_x=5, align_y=-5)
 
         self.show_directory()
 
@@ -124,10 +121,6 @@ class FileManager(arcade.gui.UIAnchorLayout):
 
     def disable(self):
         self.parent.parent.disable() # The FileManager UIManager. self.parent is the FileManager UIAnchorLayout
-
-    def exit(self):
-        self.disable()
-        self.submitted_content = "exit"
 
     def change_directory(self, directory):
         if directory.startswith("//"): # Fix / paths

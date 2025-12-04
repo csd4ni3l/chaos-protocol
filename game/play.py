@@ -3,7 +3,7 @@ import arcade, arcade.gui, pyglet, random, json
 from utils.preload import SPRITE_TEXTURES, button_texture, button_hovered_texture
 from utils.constants import button_style, dropdown_style, DO_RULES, IF_RULES, SHAPES, ALLOWED_INPUT, menu_background_color
 
-from game.rules import RuleUIBox
+from game.rules import RuleUI
 from game.sprites import BaseShape, Rectangle, Circle, Triangle
 from game.file_manager import FileManager
 
@@ -19,7 +19,7 @@ class Game(arcade.gui.UIView):
 
         self.anchor = self.add_widget(arcade.gui.UIAnchorLayout(size_hint=(1, 1)))
 
-        self.rules_box = RuleUIBox(self.window)
+        self.rules_box = RuleUI(self.window)
 
         self.file_manager = FileManager(self.window.width * 0.95, [".json"]).with_border()
 
@@ -165,8 +165,7 @@ class Game(arcade.gui.UIView):
     def on_show_view(self):
         super().on_show_view()
 
-        self.rules_box.add_rule(None, ["on_left_click", "spawn"])
-        self.rules_box.refresh_rules_display()
+        # self.rules_box.add_rule(None, ["on_left_click", "spawn"])
 
         self.sprites_box.add(arcade.gui.UILabel(text="Sprites", font_size=24, text_color=arcade.color.WHITE), anchor_x="center", anchor_y="top")
 
@@ -330,12 +329,18 @@ class Game(arcade.gui.UIView):
             self.triggered_events.append(["on_input", {"event_key": chr(symbol)}])
 
     def on_mouse_press(self, x, y, button, modifiers):
+        if not self.mode == "simulation":
+            return
+        
         if button == arcade.MOUSE_BUTTON_LEFT:
             self.triggered_events.append(["on_left_click", {}])
         elif self.mode == "simulation" and button == arcade.MOUSE_BUTTON_RIGHT:
             self.triggered_events.append(["on_right_click", {}])
 
     def on_mouse_motion(self, x, y, button, modifiers):
+        if not self.mode == "simulation":
+            return
+
         self.triggered_events.append(["on_mouse_move", {}])
 
     def disable_previous(self):
@@ -361,7 +366,7 @@ class Game(arcade.gui.UIView):
         self.mode = "export"
 
         self.file_manager.change_mode("export")
-        self.anchor.add(self.file_manager, anchor_x="center", anchor_y="top")
+        self.anchor.add(self.file_manager, anchor_x="center", anchor_y="top", align_y=-self.window.height * 0.025)
 
     def import_file(self):
         self.disable_previous()
@@ -369,7 +374,7 @@ class Game(arcade.gui.UIView):
         self.mode = "import"
 
         self.file_manager.change_mode("import")
-        self.anchor.add(self.file_manager, anchor_x="center", anchor_y="top")
+        self.anchor.add(self.file_manager, anchor_x="center", anchor_y="top", align_y=-self.window.height * 0.025)
 
     def sprites(self):
         self.disable_previous()
