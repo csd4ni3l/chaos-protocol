@@ -415,10 +415,12 @@ class RuleUI(arcade.gui.UIAnchorLayout):
                     if self.dragged_rule_ui.rule_num in connection:
                         self.connections.remove(connection)
 
-                self.remove(self.dragged_rule_ui)
+                self.rule_space.remove(self.dragged_rule_ui)
                 del self.dragged_rule_ui
 
             self.dragged_rule_ui = None
+
+            self.trigger_full_render()
         else:
             self.dragged_rule_ui = rule_ui
 
