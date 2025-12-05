@@ -1,7 +1,7 @@
 import arcade, arcade.gui, pyglet, random, json
 
 from utils.preload import SPRITE_TEXTURES, button_texture, button_hovered_texture
-from utils.constants import button_style, dropdown_style, DO_RULES, IF_RULES, SHAPES, ALLOWED_INPUT, menu_background_color
+from utils.constants import button_style, DO_RULES, IF_RULES, SHAPES, ALLOWED_INPUT
 
 from game.rules import RuleUI
 from game.sprites import BaseShape, Rectangle, Circle, Triangle
@@ -35,8 +35,7 @@ class Game(arcade.gui.UIView):
         self.y_gravity = self.settings.get("default_y_gravity", 5)
         self.triggered_events = []
 
-        self.rulesets = self.rules_box.rulesets
-        self.rule_values = self.rules_box.rule_values
+        self.rulesets = self.rules_box.get_rulesets()
 
         self.sprites_box = arcade.gui.UIAnchorLayout(size_hint=(0.95, 0.9))
 
@@ -165,8 +164,6 @@ class Game(arcade.gui.UIView):
     def on_show_view(self):
         super().on_show_view()
 
-        # self.rules_box.add_rule(None, ["on_left_click", "spawn"])
-
         self.sprites_box.add(arcade.gui.UILabel(text="Sprites", font_size=24, text_color=arcade.color.WHITE), anchor_x="center", anchor_y="top")
 
         self.sprites_grid = self.sprites_box.add(arcade.gui.UIGridLayout(columns=8, row_count=8, align="left", vertical_spacing=10, horizontal_spacing=10, size_hint=(0.95, 0.85)), anchor_x="center", anchor_y="center").with_border()
@@ -224,23 +221,8 @@ class Game(arcade.gui.UIView):
 
             self.rule_values = data["rule_values"]
             self.triggered_events = []
-            self.current_ruleset_num = 0
-            self.current_ruleset_page = 0
 
-            self.rules_content_box.clear()
-
-            for rule_box in self.rule_boxes.values():
-                rule_box.clear()
-                del rule_box
-
-            self.rule_labels = {}
-            self.rule_var_changers = {}
-            self.rule_boxes = {}
-            
-            for ruleset in data["rulesets"].values():
-                self.add_ruleset(ruleset)
-
-            self.refresh_rules_display()
+            # TODO: add rule loading here
 
         if self.mode == "export" and self.file_manager.submitted_content:            
             with open(self.file_manager.submitted_content, "w") as file:
@@ -386,6 +368,7 @@ class Game(arcade.gui.UIView):
     def simulation(self):
         self.disable_previous()
         
+        self.rulesets = self.rules_box.get_rulesets()
         self.mode = "simulation"
 
     def main_exit(self):
@@ -397,5 +380,7 @@ class Game(arcade.gui.UIView):
         
         if self.mode == "simulation":
             self.shape_batch.draw()
+        elif self.mode == "rules":
+            self.rules_box.draw()
    
         self.ui.draw()

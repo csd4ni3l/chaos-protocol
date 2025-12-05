@@ -8,9 +8,10 @@ button_texture = arcade.gui.NinePatchTexture(64 // 4, 64 // 4, 64 // 4, 64 // 4,
 button_hovered_texture = arcade.gui.NinePatchTexture(64 // 4, 64 // 4, 64 // 4, 64 // 4, arcade.load_texture(os.path.join(_assets_dir, 'graphics', 'button_hovered.png')))
 
 SPRITE_TEXTURES = {
-    "circle": arcade.load_texture(os.path.join(_assets_dir, 'graphics', 'sprites', 'circle.png')),
-    "rectangle": arcade.load_texture(os.path.join(_assets_dir, 'graphics', 'sprites', 'rectangle.png')),
-    "triangle": arcade.load_texture(os.path.join(_assets_dir, 'graphics', 'sprites', 'triangle.png')),
+    os.path.splitext(file_name)[0]: arcade.load_texture(os.path.join(_assets_dir, 'graphics', 'sprites', file_name))
+    for file_name in os.listdir(os.path.join(_assets_dir, 'graphics', 'sprites'))
 }
 
 theme_sound = arcade.Sound(os.path.join(_assets_dir, 'sound', 'music.ogg'))
+
+trash_bin = arcade.load_animated_gif(os.path.join(_assets_dir, 'graphics', 'trash_bin.gif'))
