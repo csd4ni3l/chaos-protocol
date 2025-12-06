@@ -3,11 +3,15 @@ from arcade.types import Color
 from arcade.gui.widgets.buttons import UITextureButtonStyle, UIFlatButtonStyle
 from arcade.gui.widgets.slider import UISliderStyle
 
-LOGICAL_OPERATORS = ["and", "or"]
 SHAPES = ["rectangle", "circle", "triangle"]
 VAR_NAMES = ["a", "b", "c", "d", "e", "f", "g"]
 
 ALLOWED_INPUT = ["a", "b", "c", "d", "e", "q", "w", "s", "t"]
+
+TRIGGER_COLOR = (255, 204, 102)
+DO_COLOR = (102, 178, 255)
+IF_COLOR = (144, 238, 144)
+FOR_COLOR = (255, 182, 193)
 
 COLORS = [
     "BLACK", "WHITE", "GRAY", "DARK_GRAY", "CYAN", 
@@ -45,38 +49,43 @@ VAR_OPTIONS = {
     "comparison": COMPARISONS
 }
 
-IF_RULES = {
+TRIGGER_RULES = {
+    "every_update": {
+        "key": "every_update",
+        "description": "Every Update",
+    },
+    "start": {
+        "key": "start",
+        "description": "On Game Start",
+    },
+    "on_input": {
+        "key": "on_input",
+        "description": "IF {a} key is pressed",
+    },
     "x_position_compare": {
         "key": "x_position_compare",
         "description": "IF X for {a} shape is {b} {c}",
-        "trigger": "every_update",
         "user_vars": ["shape_type", "comparison", "variable"],
         "vars": ["shape_type", "comparison", "variable", "event_shape_type", "shape_x"],
         "func": lambda *v: (v[0] == v[3]) and eval(f"{v[4]} {v[1]} {v[2]}")
     },
-    
     "y_position_compare": {
         "key": "y_position_compare",
         "description": "IF Y for {a} shape is {b} {c}",
-        "trigger": "every_update",
         "user_vars": ["shape_type", "comparison", "variable"],
         "vars": ["shape_type", "comparison", "variable", "event_shape_type", "shape_y"],
         "func": lambda *v: (v[0] == v[3]) and eval(f"{v[4]} {v[1]} {v[2]}")
     },
-    
     "size_compare": {
         "key": "size_compare",
         "description": "IF {a} shape size is {b} {c}",
-        "trigger": "every_update",
         "user_vars": ["shape_type", "comparison", "variable"],
         "vars": ["shape_type", "comparison", "variable", "event_shape_type", "shape_size"],
         "func": lambda *v: (v[0] == v[3]) and eval(f"{v[4]} {v[1]} {v[2]}")
     },
-    
     "spawns": {
         "key": "spawns",
         "description": "IF {a} shape spawns",
-        "trigger": "spawn",
         "user_vars": ["shape_type"],
         "vars": ["shape_type", "event_shape_type"],
         "func": lambda *v: v[0] == v[1]
@@ -84,7 +93,6 @@ IF_RULES = {
     "destroyed": {
         "key": "destroyed",
         "description": "IF {a} shape is destroyed",
-        "trigger": "destroyed",
         "user_vars": ["shape_type"],
         "vars": ["shape_type", "event_shape_type"],
         "func": lambda *v: v[0] == v[1]
@@ -92,7 +100,6 @@ IF_RULES = {
     "x_velocity_changes": {
         "key": "x_velocity_changes",
         "description": "IF {a} shape X velocity changes",
-        "trigger": "x_velocity_change",
         "user_vars": ["shape_type"],
         "vars": ["shape_type", "event_shape_type"],
         "func": lambda *v: v[0] == v[1]
@@ -100,7 +107,6 @@ IF_RULES = {
     "y_velocity_changes": {
         "key": "y_velocity_changes",
         "description": "IF {a} shape Y velocity changes",
-        "trigger": "y_velocity_change",
         "user_vars": ["shape_type"],
         "vars": ["shape_type", "event_shape_type"],
         "func": lambda *v: v[0] == v[1]
@@ -108,7 +114,6 @@ IF_RULES = {
     "color_changes": {
         "key": "color_changes",
         "description": "IF {a} shape color changes",
-        "trigger": "color_change",
         "user_vars": ["shape_type"],
         "vars": ["shape_type", "event_shape_type"],
         "func": lambda *v: v[0] == v[1]
@@ -116,7 +121,6 @@ IF_RULES = {
     "size_changes": {
         "key": "size_changes",
         "description": "IF {a} shape size changes",
-        "trigger": "size_change",
         "user_vars": ["shape_type"],
         "vars": ["shape_type", "event_shape_type"],
         "func": lambda *v: v[0] == v[1]
@@ -124,7 +128,6 @@ IF_RULES = {
     "morphs": {
         "key": "morphs",
         "description": "IF {a} shape morphs into {b}",
-        "trigger": "morph",
         "user_vars": ["shape_type", "target_type"],
         "vars": ["shape_type", "target_type", "event_a_type", "event_b_type"],
         "func": lambda *v: (v[0] == v[2]) and (v[3] == v[1])
@@ -132,59 +135,62 @@ IF_RULES = {
     "collides": {
         "key": "collides",
         "description": "IF {a} shape collides with {b}",
-        "trigger": "collision",
         "user_vars": ["shape_type", "target_type"],
         "vars": ["shape_type", "target_type", "event_a_type", "event_b_type"],
         "func": lambda *v: (v[0] == v[2]) and (v[3] == v[1])
     },
-    "on_left_click": {
-        "key": "on_left_click",
-        "description": "IF you left click",
-        "trigger": "on_left_click",
-        "user_vars": [],
-        "vars": [],
-        "func": lambda *v: True
-    },
-    "on_right_click": {
-        "key": "on_right_click",
-        "description": "IF you right click",
-        "trigger": "on_right_click",
-        "user_vars": [],
-        "vars": [],
-        "func": lambda *v: True
-    },
-    "on_mouse_move": {
-        "key": "on_mouse_move",
-        "description": "IF mouse moves",
-        "trigger": "on_mouse_move",
-        "user_vars": [],
-        "vars": [],
-        "func": lambda *v: True
-    },
-    "on_input": {
-        "key": "on_input",
-        "description": "IF {a} key is pressed",
-        "trigger": "on_input",
-        "user_vars": ["key_input"],
-        "vars": ["key_input", "event_key"],
-        "func": lambda *v: v[0] == v[1]
-    },    
-    "game_launch": {
-        "key": "game_launch",
-        "description": "IF game launches",
-        "trigger": "game_launch",
-        "user_vars": [],
-        "vars": [],
-        "func": lambda *v: True
-    },
-    "every_update": {
-        "key": "every_update",
-        "description": "Every update",
-        "trigger": "every_update",
-        "user_vars": [],
-        "vars": [],
-        "func": lambda *v: True
+}
+
+FOR_RULES = {
+    "every_shape": {
+        "key": "every_shape",
+        "description": "For every shape",
     }
+}
+
+IF_RULES = {
+    "x_position_compare": {
+        "key": "x_position_compare",
+        "description": "IF X is {a} {b}",
+        "user_vars": ["comparison", "variable"],
+        "vars": ["comparison", "variable", "shape_x"],
+        "func": lambda *v: eval(f"{v[2]} {v[0]} {v[1]}")
+    },
+    "y_position_compare": {
+        "key": "y_position_compare",
+        "description": "IF Y is {a} {b}",
+        "user_vars": ["comparison", "variable"],
+        "vars": ["comparison", "variable", "shape_y"],
+        "func": lambda *v: eval(f"{v[2]} {v[0]} {v[1]}")
+    },
+    "size_compare": {
+        "key": "size_compare",
+        "description": "IF size is {a} {b}",
+        "user_vars": ["comparison", "variable"],
+        "vars": ["comparison", "variable", "shape_size"],
+        "func": lambda *v: eval(f"{v[2]} {v[0]} {v[1]}")
+    },
+    "x_velocity_compare": {
+        "key": "x_velocity_compare",
+        "description": "IF X velocity is {a} {b}",
+        "user_vars": ["comparison", "variable"],
+        "vars": ["comparison", "variable", "shape_x_velocity"],
+        "func": lambda *v: eval(f"{v[2]} {v[0]} {v[1]}")
+    },
+    "y_velocity_compare": {
+        "key": "y_velocity_compare",
+        "description": "IF Y velocity is {a} {b}",
+        "user_vars": ["comparison", "variable"],
+        "vars": ["comparison", "variable", "shape_y_velocity"],
+        "func": lambda *v: eval(f"{v[2]} {v[0]} {v[1]}")
+    },
+    "color_is": {
+        "key": "color_is",
+        "description": "IF color is {a}",
+        "user_vars": ["color"],
+        "vars": ["color", "shape_color"],
+        "func": lambda *v: v[0] == v[1]
+    },
 }
 
 NON_COMPATIBLE_WHEN = [

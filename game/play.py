@@ -35,7 +35,7 @@ class Game(arcade.gui.UIView):
         self.y_gravity = self.settings.get("default_y_gravity", 5)
         self.triggered_events = []
 
-        self.rulesets = self.rules_box.get_rulesets()
+        self.rulesets, self.if_rules = self.rules_box.get_rulesets()
 
         self.sprites_box = arcade.gui.UIAnchorLayout(size_hint=(0.95, 0.9))
 
@@ -176,13 +176,13 @@ class Game(arcade.gui.UIView):
 
         self.triggered_events.append(["game_launch", {}])
 
-    def get_rule_values(self, rule_num, rule_dict, rule_values, event_args):
-        args = [rule_values[f"{rule_num}_{user_var}_{n}"] for n, user_var in enumerate(rule_dict["user_vars"])]
+    def get_rule_values(self, rule_dict, rule_values, event_args):
+        args = [rule_values[f"{user_var}_{n}"] for n, user_var in enumerate(rule_dict["user_vars"])]
 
         return args + [event_args[var] for var in rule_dict.get("vars", []) if not var in rule_dict["user_vars"]]
 
-    def check_rule(self, rule_num, rule_dict, rule_values, event_args):
-        return rule_dict["func"](*self.get_rule_values(rule_num, rule_dict, rule_values, event_args))
+    def check_rule(self, rule_dict, rule_values, event_args):
+        return rule_dict["func"](*self.get_rule_values(rule_dict, rule_values, event_args))
     
     def get_action_function(self, action_dict):
         ACTION_FUNCTION_DICT = {
@@ -207,8 +207,8 @@ class Game(arcade.gui.UIView):
 
         return ACTION_FUNCTION_DICT[action_dict["type"]][action_dict["name"]]
 
-    def run_do_rule(self, rule_num, rule_dict, rule_values, event_args):
-        self.get_action_function(rule_dict["action"])(*self.get_rule_values(rule_num, rule_dict, rule_values, event_args))
+    def run_do_rule(self, rule_dict, rule_values, event_args):
+        self.get_action_function(rule_dict["action"])(*self.get_rule_values(rule_dict, rule_values, event_args))
 
     def on_update(self, delta_time):
         if self.mode == "import" and self.file_manager.submitted_content:
@@ -239,8 +239,31 @@ class Game(arcade.gui.UIView):
         while len(self.triggered_events) > 0:
             trigger, trigger_args = self.triggered_events.pop(0)
 
-            for rule in self.rulesets:
-                ...
+            # In the new version, a DO rule's dependencies are the ruleset itself which trigger it
+            # Since there could be multiple IFs that depend on each other, we need to get the entrypoint values first and then interpret the tree.
+            event_args = trigger_args
+
+            if_rule_values = {}
+
+            for if_rule in self.if_rules:
+                if_rule_dict = IF_RULES[if_rule[0]]
+                if "shape_type" in if_rule_dict["user_vars"]:
+                    is_true = False
+                    for shape in self.shapes:
+                        if is_true:
+                            break
+
+                        event_args = trigger_args.copy()
+                        if not "event_shape_type" in trigger_args:
+                            event_args.update({"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.shape_color})
+                        
+                        is_true = self.check_rule(if_rule_dict, if_rule[1], trigger_args)
+
+                    if_rule_values[if_rule[2]] = is_true
+
+                else:
+                    event_args = trigger_args.copy()
+                    if_rule_values[if_rule[2]] = self.check_rule(if_rule_dict, if_rule[1], trigger_args)
 
         for shape in self.shapes:
             for shape_b in self.shapes:
@@ -276,6 +299,14 @@ class Game(arcade.gui.UIView):
             return
 
         self.triggered_events.append(["on_mouse_move", {}])
+
+    def on_mouse_drag(self, x, y, dx, dy, _buttons, _modifiers):
+        if self.mode == "rules" and arcade.MOUSE_BUTTON_MIDDLE == _buttons:
+            self.rules_box.camera.position -= (dx, dy)
+
+    def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
+        if self.mode == "rules":
+            self.rules_box.camera.zoom *= 1 + scroll_y * 0.1
 
     def disable_previous(self):
         if self.mode in ["import", "export"]:
@@ -320,7 +351,7 @@ class Game(arcade.gui.UIView):
     def simulation(self):
         self.disable_previous()
         
-        self.rulesets = self.rules_box.get_rulesets()
+        self.rulesets, self.if_rules = self.rules_box.get_rulesets()
         self.mode = "simulation"
 
     def main_exit(self):
@@ -333,6 +364,9 @@ class Game(arcade.gui.UIView):
         if self.mode == "simulation":
             self.shape_batch.draw()
         elif self.mode == "rules":
-            self.rules_box.draw()
+            with self.rules_box.camera.activate():
+                self.rules_box.draw()
+                
+            self.rules_box.draw_unproject()
    
         self.ui.draw()

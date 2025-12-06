@@ -1,19 +1,23 @@
 from utils.constants import (
     DO_RULES,
     IF_RULES,
-    LOGICAL_OPERATORS,
     NON_COMPATIBLE_WHEN,
     NON_COMPATIBLE_DO_WHEN,
     VAR_NAMES,
     VAR_DEFAULT,
-    VAR_OPTIONS,
-    dropdown_style,
-    slider_style,
+    TRIGGER_RULES,
+    FOR_RULES,
     button_style,
+    DO_COLOR,
+    IF_COLOR,
+    FOR_COLOR,
+    TRIGGER_COLOR
 )
+from typing import List
 from utils.preload import button_texture, button_hovered_texture, trash_bin
-from collections import deque, defaultdict
-import arcade, arcade.gui, random
+from arcade.gui.experimental.scroll_area import UIScrollArea, UIScrollBar
+from dataclasses import dataclass, field
+import arcade, arcade.gui, pyglet, random
 
 IF_KEYS = tuple(IF_RULES.keys())
 DO_KEYS = tuple(DO_RULES.keys())
@@ -26,49 +30,19 @@ def generate_rule(rule_type):
         return random.choice(IF_KEYS)
     elif rule_type == "do":
         return random.choice(DO_KEYS)
-    else:
-        return random.choice(LOGICAL_OPERATORS)
-
+    
+def get_rule_description(rule_type, rule):
+    if rule_type == "if":
+        return IF_RULES[rule]["description"]
+    if rule_type == "for":
+        return FOR_RULES[rule]["description"]
+    if rule_type == "trigger":
+        return TRIGGER_RULES[rule]["description"]
+    if rule_type == "do":
+        return DO_RULES[rule]["description"]
+    
 def per_widget_height(height, widget_count):
     return height // widget_count
-
-def cubic_bezier_point(p0, p1, p2, p3, t):
-    u = 1 - t
-    x = (u ** 3) * p0[0] + 3 * (u ** 2) * t * p1[0] + 3 * u * (t ** 2) * p2[0] + (t ** 3) * p3[0]
-    y = (u ** 3) * p0[1] + 3 * (u ** 2) * t * p1[1] + 3 * u * (t ** 2) * p2[1] + (t ** 3) * p3[1]
-    return x, y
-
-def cubic_bezier_points(p0, p1, p2, p3, segments=40):
-    return [cubic_bezier_point(p0, p1, p2, p3, i / segments) for i in range(segments + 1)]
-
-def connection_between(p0, p3, start_dir_y, end_dir_y):
-    offset = max(abs(p3[1] - p0[1]) * 0.5, 20)
-    c1 = (p0[0], p0[1] + start_dir_y * offset)
-    c2 = (p3[0], p3[1] + end_dir_y * offset)
-
-    return cubic_bezier_points(p0, c1, c2, p3, segments=100)
-
-def connected_component(edges, start):
-    graph = defaultdict(set)
-    for u, v, _, __ in edges:
-        graph[u].add(v)
-        graph[v].add(u)
-
-    seen = set([start])
-    queue = deque([start])
-    connected_edges = []
-
-    while queue:
-        node = queue.popleft()
-        for neighbor in graph[node]:
-            if neighbor not in seen:
-                seen.add(neighbor)
-                queue.append(neighbor)
-                connected_edges.append((node, neighbor))
-            elif (neighbor, node) not in connected_edges and (node, neighbor) not in connected_edges:
-                connected_edges.append((node, neighbor))
-
-    return connected_edges
 
 def get_rule_defaults(rule_type):
     if rule_type == "if":
@@ -105,251 +79,139 @@ def get_rule_defaults(rule_type):
             for rule_key, rule_dict in DO_RULES.items()
         }
 
-def backtrace(node: dict):
-    dependencies = []
+@dataclass
+class Block:
+    x: float
+    y: float
+    label: str
+    rule_type: str
+    rule: str
+    rule_num: int
+    rule_values: dict[str, int | str]
+    children: List["Block"] = field(default_factory=list)
 
-    for prev_node_list in node.previous.values():
-        for prev_node in prev_node_list:
-            if prev_node.rule_type == "comparison":
-                comparison_children = backtrace(prev_node)
-                dependencies.append([
-                    prev_node.rule_type, 
-                    prev_node.rule, 
-                    comparison_children,
-                    prev_node.rule_num
-                ])
-            elif prev_node.rule_type == "if":
-                dependencies.append([prev_node.rule_type, prev_node.rule, prev_node.rule_values, prev_node.rule_num])
-            elif prev_node.rule_type == "do":
-                dependencies.append([prev_node.rule_type, prev_node.rule, prev_node.rule_values, prev_node.rule_num])
+class BlockRenderer:
+    def __init__(self, blocks: List[Block], indent: int = 10):
+        self.blocks = blocks
+        self.indent = indent
+        self.shapes = pyglet.graphics.Batch()
+        self.shapes_by_rule_num = {}
+        self.text_objects = []
+        self.text_by_rule_num = {}
+        self.refresh()
 
-    return dependencies
-
-class RuleBox(arcade.gui.UIBoxLayout):
-    def __init__(self, x, y, width, height, rule_num, rule_type, rule):
-        super().__init__(space_between=5, x=x, y=y, width=width, height=height)
-
-        self.rule = rule
-        self.rule_num = rule_num
-        self.rule_type = rule_type
-        self.initialize_rule()
+    def refresh(self):
+        for shapes_list in self.shapes_by_rule_num.values():
+            for shape in shapes_list:
+                shape.delete()
         
-        self.previous = {}
+        for text_list in self.text_by_rule_num.values():
+            for text in text_list:
+                text.delete()
 
-    def initialize_rule(self):
-        if not self.rule_type == "comparison":
-            self.rule_dict = (
-                IF_RULES[self.rule] if self.rule_type == "if" else DO_RULES[self.rule]
-            )
-            self.defaults = get_rule_defaults(self.rule_type)
-            self.rule_values = {}
-            self.var_labels = {}
-            self.var_changers = {}
+        self.shapes = pyglet.graphics.Batch()
+        self.shapes_by_rule_num = {}
+        self.text_objects = []
+        self.text_by_rule_num = {}
+        for b in self.blocks.values():
+            self._build_block(b, b.x, b.y)
 
-            widget_count = 2 + len(self.rule_dict["user_vars"])
+    def _build_block(self, b: Block, x: int, y: int) -> int:
+        is_wrap = b.rule_type != "do"
+        h, w = 42, 280
 
-            self.per_widget_height = per_widget_height(
-                self.height, 
-                widget_count
-            )
-        else:
-            self.per_widget_height = per_widget_height(
-                self.height,
-                2
-            )
+        if b.rule_type == "if":
+            color = IF_COLOR
+        elif b.rule_type == "trigger":
+            color = TRIGGER_COLOR
+        elif b.rule_type == "do":
+            color = DO_COLOR
+        elif b.rule_type == "for":
+            color = FOR_COLOR
 
-        self.init_ui()
-    
-    def init_ui(self):
-        if self.rule_type == "do":
-            self.previous_button, self.drag_button = self.add_extra_buttons(["IF/Comparison", "Drag"])
-        elif self.rule_type == "if":
-            self.drag_button = self.add_extra_buttons("Drag")[0]
-        elif self.rule_type == "comparison":
-            self.previous_button_1, self.previous_button_2, self.drag_button = self.add_extra_buttons(["IF 1", "IF 2", "Drag"])
-
-        dropdown_options = [desc for desc, _ in self.defaults.values()] if not self.rule_type == "comparison" else LOGICAL_OPERATORS
-        self.desc_label = self.add(
-            arcade.gui.UIDropdown(
-                default=self.defaults[self.rule][0] if not self.rule_type == "comparison" else dropdown_options[0],
-                options=dropdown_options,
-                font_size=13,
-                active_style=dropdown_style,
-                primary_style=dropdown_style,
-                dropdown_style=dropdown_style,
-                width=self.width,
-                height=self.per_widget_height
-            )
-        )
-        self.desc_label.on_change = lambda event: self.change_rule_type(event.new_value)
+        lx, ly = x, y - h 
         
-        if self.rule_type == "comparison":
-            self.next_button = self.add_extra_buttons("Do / Comparison")[0]
-            return
+        if b.rule_num not in self.shapes_by_rule_num:
+            self.shapes_by_rule_num[b.rule_num] = []
+        if b.rule_num not in self.text_by_rule_num:
+            self.text_by_rule_num[b.rule_num] = []
+        
+        rect = pyglet.shapes.BorderedRectangle(lx, ly, w, h, 2, color, arcade.color.BLACK, batch=self.shapes)
+        self.shapes_by_rule_num[b.rule_num].append(rect)
+        
+        text_obj = pyglet.text.Label(text=b.label, x=lx + 10, y=ly + 20, color=arcade.color.BLACK, font_size=12, weight="bold")
+        self.text_objects.append(text_obj)
+        self.text_by_rule_num[b.rule_num].append(text_obj)
 
-        for n, variable_type in enumerate(self.rule_dict["user_vars"]):
-            key = f"{variable_type}_{n}"
+        ny = ly
+        if is_wrap:
+            iy = ny
+            for child in b.children:
+                child.x = lx + self.indent + 5
+                child.y = iy - 2
+                iy = self._build_block(child, lx + self.indent + 5, iy - 2)
+            
+            bar_h = ny - iy 
+            bar_filled = pyglet.shapes.Rectangle(lx + 2, iy + 2, self.indent, bar_h, color, batch=self.shapes)
+            line1 = pyglet.shapes.Line(lx, ny, lx, iy, 2, arcade.color.BLACK, batch=self.shapes)
+            bottom = pyglet.shapes.BorderedRectangle(lx, iy - 8, w, 24, 2, color, arcade.color.BLACK, batch=self.shapes)
 
-            defaults = get_rule_defaults(self.rule_type)
-            default_values = defaults[self.rule][1]
-            self.rule_values[key] = default_values[VAR_NAMES[n]]
-
-            box = self.add(
-                arcade.gui.UIBoxLayout(
-                    vertical=False, 
-                    width=self.width, 
-                    height=self.per_widget_height * 2
-                )
-            )
-
-            self.var_labels[key] = box.add(
-                arcade.gui.UILabel(
-                    f"{VAR_NAMES[n]}: " if not variable_type in ["variable", "size"] else f"{VAR_NAMES[n]}: {self.rule_values[key]}",
-                    font_size=11,
-                    text_color=arcade.color.WHITE,
-                    width=self.width,
-                    height=self.per_widget_height,
-                )
-            )
-
-            if variable_type in ["variable", "size"]:
-                slider = box.add(
-                    arcade.gui.UISlider(
-                        value=self.rule_values[key],
-                        min_value=VAR_OPTIONS[variable_type][0],
-                        max_value=VAR_OPTIONS[variable_type][1],
-                        step=1,
-                        style=slider_style,
-                        width=self.width,
-                        height=self.per_widget_height,
-                    )
-                )
-                slider._render_steps = lambda surface: None
-                slider.on_change = (
-                    lambda event,
-                    variable_type=variable_type,
-                    n=n: self.change_var_value(variable_type, n, event.new_value)
-                )
-
-                self.var_changers[key] = slider
-
-            else:
-                dropdown = box.add(
-                    arcade.gui.UIDropdown(
-                        default=self.rule_values[key],
-                        options=VAR_OPTIONS[variable_type],
-                        active_style=dropdown_style,
-                        primary_style=dropdown_style,
-                        dropdown_style=dropdown_style,
-                        width=self.width,
-                        height=self.per_widget_height,
-                    )
-                )
-                dropdown.on_change = (
-                    lambda event,
-                    variable_type=variable_type,
-                    n=n: self.change_var_value(variable_type, n, event.new_value)
-                )
-
-                self.var_changers[key] = dropdown
-
-        if self.rule_type == "if":
-            self.next_button = self.add_extra_buttons("Do / Comparison")[0]
-
-    def add_extra_buttons(self, texts: list[str] | str):
-        if not isinstance(texts, list):
-            texts = [texts]
-            box = self
+            self.shapes_by_rule_num[b.rule_num].extend([bar_filled, line1, bottom])
+            
+            return iy - 24
         else:
-            box = self.add(
-                arcade.gui.UIBoxLayout(
-                    vertical=False, 
-                    width=self.width, 
-                    height=self.per_widget_height
-                )
-            )
+            for child in b.children:
+                ny = self._build_block(child, lx, ny)
+            return ny
 
-        return [
-            box.add(
-                arcade.gui.UITextureButton(
-                    text=text,
-                    width=self.width / len(texts),
-                    height=self.per_widget_height,
-                    style=button_style,
-                    texture=button_texture,
-                    texture_hovered=button_hovered_texture,
-                )
-            )
-            for text in texts
-        ]
+    def move_block(self, x, y, rule_num):
+        for element in self.shapes_by_rule_num[rule_num] + self.text_by_rule_num[rule_num]:
+            element.x += x
+            element.y += y
 
-    def change_var_value(self, variable_type, n, value):
-        key = f"{variable_type}_{n}"
+        block = self._find_block(rule_num)
 
-        self.rule_values[key] = value
+        for child in block.children:
+            self.move_block(x, y, child.rule_num)
 
-        values = {}
-        for i, variable in enumerate(self.rule_dict["user_vars"]):
-            lookup_key = f"{variable}_{i}"
-            values[VAR_NAMES[i]] = self.rule_values.get(
-                lookup_key, VAR_DEFAULT[variable]
-            )
+    def _find_block(self, rule_num):
+        if rule_num in self.blocks:
+            return self.blocks[rule_num]
+        
+        for block in self.blocks.values():
+            found = self._find_block_recursive(block, rule_num)
+            if found:
+                return found
+        return None
 
-        description = self.rule_dict["description"].format_map(values)
+    def _find_block_recursive(self, block, rule_num):
+        for child in block.children:
+            if child.rule_num == rule_num:
+                return child
+            found = self._find_block_recursive(child, rule_num)
+            if found:
+                return found
+        return None
 
-        self.desc_label.text = description
-
-        if variable_type in ["variable", "size"]:
-            self.var_labels[key].text = f"{VAR_NAMES[n]}: {value}"
-
-    def change_rule_type(self, new_rule_desc):
-        self.rule = next(key for key, default_list in self.defaults.items() if default_list[0] == new_rule_desc) if self.rule_type != "comparison" else new_rule_desc
-        self.clear()
-        self.initialize_rule()
-
-    def __repr__(self):
-        return f"<{self.rule_type} ({self.rule}, {self.rule_num})>"
-
-def get_connection_pos(rule_ui: RuleBox, idx):
-    if rule_ui.rule_type == "comparison":
-        if idx == 0:
-            button = rule_ui.previous_button_1
-            y = button.top
-            direction = 1
-        elif idx == 1:
-            button = rule_ui.previous_button_2
-            y = button.top
-            direction = 1
-        elif idx == 2:
-            button = rule_ui.next_button
-            y = button.bottom
-            direction = -1
-    elif rule_ui.rule_type == "if":
-        button = rule_ui.next_button
-        y = button.bottom
-        direction = -1
-    elif rule_ui.rule_type == "do":
-        button = rule_ui.previous_button
-        y = button.top
-        direction = 1
-    
-    return (button.center_x, y), direction
+    def draw(self):
+        self.shapes.draw()
+        for t in self.text_objects:
+            t.draw()
 
 class RuleUI(arcade.gui.UIAnchorLayout):
     def __init__(self, window: arcade.Window):
-        super().__init__(size_hint=(0.95, 0.875))
+        super().__init__(size_hint=(1, 0.875))
 
         self.window = window
         self.current_rule_num = 0
         self.rule_values = {}
 
-        self.dragged_rule_ui: RuleBox | None = None
-        self.rule_ui: dict[str, RuleBox] = {}
-        
-        self.connections = []
-        self.to_connect = None
-        self.to_connect_idx = None
-        self.allowed_next_connection = []
+        self.rulesets: dict[int, Block] = {}
+
+        self.block_renderer = BlockRenderer(self.rulesets)
+        self.camera = arcade.Camera2D()
+    
+        self.dragged_rule_ui: Block | None = None
 
         self.rules_label = self.add(
             arcade.gui.UILabel(
@@ -365,134 +227,71 @@ class RuleUI(arcade.gui.UIAnchorLayout):
             )
         )
 
-        self.add_button_box = self.add(
-            arcade.gui.UIBoxLayout(space_between=10),
-            anchor_x="center",
-            anchor_y="bottom",
-        )
+        self.create_sidebar = self.add(arcade.gui.UIBoxLayout(size_hint=(0.15, 1), vertical=False, space_between=5), anchor_x="left", anchor_y="bottom")
 
-        self.add_if_rule_button = self.add_button_box.add(
-            arcade.gui.UIFlatButton(
-                text="Add IF rule",
-                width=self.window.width * 0.225,
-                height=self.window.height / 25,
-                style=dropdown_style,
-            )
-        )
-        self.add_if_rule_button.on_click = lambda event: self.add_rule("if")
+        self.scroll_area = UIScrollArea(size_hint=(0.95, 1)) # center on screen
+        self.scroll_area.scroll_speed = -50
+        self.create_sidebar.add(self.scroll_area)
 
-        self.add_do_rule_button = self.add_button_box.add(
-            arcade.gui.UIFlatButton(
-                text="Add DO rule",
-                width=self.window.width * 0.225,
-                height=self.window.height / 25,
-                style=dropdown_style,
-            )
-        )
-        self.add_do_rule_button.on_click = lambda event: self.add_rule("do")
+        self.scrollbar = UIScrollBar(self.scroll_area)
+        self.scrollbar.size_hint = (0.075, 1)
+        self.create_sidebar.add(self.scrollbar)
 
-        self.add_comparison_button = self.add_button_box.add(
-            arcade.gui.UIFlatButton(
-                text="Add comparison",
-                width=self.window.width * 0.225,
-                height=self.window.height / 25,
-                style=dropdown_style,
-            )
-        )
-        self.add_comparison_button.on_click = lambda event: self.add_rule("comparison")
+        self.create_box = self.scroll_area.add(arcade.gui.UIBoxLayout(space_between=10))
 
-        self.rule_space = self.add(arcade.gui.UIWidget(size_hint=(1, 1)))
+        self.create_box.add(arcade.gui.UISpace(height=self.window.height / 100))
+        self.create_box.add(arcade.gui.UILabel(text="Trigger Rules", font_size=18))
+        self.create_box.add(arcade.gui.UISpace(height=self.window.height / 200))
+        for trigger_rule, trigger_rule_data in TRIGGER_RULES.items():
+            create_button = self.create_box.add(arcade.gui.UITextureButton(text=trigger_rule_data["description"].format_map({
+                "a": "a",
+                "b": "b",
+                "c": "c"
+            }), width=self.window.width * 0.125, multiline=True, height=self.window.height * 0.05, style=button_style, texture=button_texture, texture_hovered=button_hovered_texture))
+            create_button.on_click = lambda event, trigger_rule=trigger_rule: self.add_rule("trigger", trigger_rule)
 
-        self.create_connected_ruleset([
-            ("if", "x_position_compare"), 
-            ("if", "y_position_compare"),
-            ("comparison", "and"),
-            ("comparison", "and"),
-            ("do", "move_x")], 
-            [
-                [0, 2, 0, 0], # x_position_compare 0 -> first comparison 0
-                [1, 2, 0, 1], # y_position_compare 0 -> first comparison 1
-                [2, 3, 2, 0], # first comparison 2 (output) -> second comparison 0
-                [1, 3, 0, 1], # y_position_compare 0 -> -> second comparison 1
-                [3, 4, 2, 0] # second comparison 2 (output) -> do 
-            ]
-        )
+        self.create_box.add(arcade.gui.UISpace(height=self.window.height / 100))
+        self.create_box.add(arcade.gui.UILabel(text="IF Rules", font_size=18))
+        self.create_box.add(arcade.gui.UISpace(height=self.window.height / 200))
+        for if_rule, if_rule_data in IF_RULES.items():
+            create_button = self.create_box.add(arcade.gui.UITextureButton(text=if_rule_data["description"].format_map({
+                "a": "a",
+                "b": "b",
+                "c": "c"
+            }), width=self.window.width * 0.135, multiline=True, height=self.window.height * 0.05, style=button_style, texture=button_texture, texture_hovered=button_hovered_texture))
+            create_button.on_click = lambda event, if_rule=if_rule: self.add_rule("if", if_rule)
 
+        self.create_box.add(arcade.gui.UISpace(height=self.window.height / 100))
+        self.create_box.add(arcade.gui.UILabel(text="DO Rules", font_size=18))
+        self.create_box.add(arcade.gui.UISpace(height=self.window.height / 200))
+        for do_rule, do_rule_data in DO_RULES.items():
+            create_button = self.create_box.add(arcade.gui.UITextureButton(text=do_rule_data["description"].format_map({
+                "a": "a",
+                "b": "b",
+                "c": "c"
+            }), width=self.window.width * 0.135, multiline=True, height=self.window.height * 0.05, style=button_style, texture=button_texture, texture_hovered=button_hovered_texture))
+            create_button.on_click = lambda event, do_rule=do_rule: self.add_rule("do", do_rule)
+            
+        self.create_box.add(arcade.gui.UISpace(height=self.window.height / 100))
+        self.create_box.add(arcade.gui.UILabel(text="For Rules", font_size=18))
+        self.create_box.add(arcade.gui.UISpace(height=self.window.height / 200))
+        for for_rule, for_rule_data in FOR_RULES.items():
+            create_button = self.create_box.add(arcade.gui.UITextureButton(text=for_rule_data["description"].format_map({
+                "a": "a",
+                "b": "b",
+                "c": "c"
+            }), width=self.window.width * 0.135, multiline=True, height=self.window.height * 0.05, style=button_style, texture=button_texture, texture_hovered=button_hovered_texture))
+            create_button.on_click = lambda event, for_rule=for_rule: self.add_rule("for", for_rule)
+            
         self.trash_spritelist = arcade.SpriteList()
         self.trash_sprite = trash_bin
+        self.trash_sprite.scale = 0.5
         self.trash_sprite.position = (self.window.width * 0.9, self.window.height * 0.2)
         self.trash_spritelist.append(self.trash_sprite)
 
-    def set_previous(self, rule_ui_a, rule_ui_b, to_connect_idx, idx):
-        if rule_ui_a.rule_type == "if" and to_connect_idx == 0:
-            if idx not in rule_ui_b.previous:
-                rule_ui_b.previous[idx] = []
-            rule_ui_b.previous[idx].append(rule_ui_a)
-        elif rule_ui_a.rule_type == "comparison":
-            if to_connect_idx == 2:
-                if idx not in rule_ui_b.previous:
-                    rule_ui_b.previous[idx] = []
-                rule_ui_b.previous[idx].append(rule_ui_a)
-            else:
-                if to_connect_idx not in rule_ui_a.previous:
-                    rule_ui_a.previous[to_connect_idx] = []
-                rule_ui_a.previous[to_connect_idx].append(rule_ui_b)
-        elif rule_ui_a.rule_type == "do" and idx == 0:
-            if idx not in rule_ui_a.previous:
-                rule_ui_a.previous[0] = []
-            rule_ui_a.previous[0].append(rule_ui_b)
-
-    def connection(self, rule_ui, allowed_next_connection, idx):
-        if self.to_connect is not None:
-            old_rule_ui = self.rule_ui[self.to_connect]
-            old_rule_type = old_rule_ui.rule_type
-            if (
-                    rule_ui.rule_type not in self.allowed_next_connection or
-                    old_rule_type not in allowed_next_connection or 
-                    (old_rule_type == "if" and rule_ui.rule_type == "if") or
-                    (old_rule_type == "do" and rule_ui.rule_type in ["do", "comparison"]) or 
-                    rule_ui.rule_num == self.to_connect
-                ):
-
-                return
-            
-            self.connections.append([self.to_connect, rule_ui.rule_num, self.to_connect_idx, idx])
-
-            self.set_previous(old_rule_ui, rule_ui, self.to_connect_idx, idx)
-
-            self.allowed_next_connection = None
-            self.to_connect = None
-            self.to_connect_idx = None
-        else:
-            self.allowed_next_connection = allowed_next_connection
-            self.to_connect = rule_ui.rule_num
-            self.to_connect_idx = idx
-
-    def drag(self, rule_ui):
-        if self.dragged_rule_ui:
-            if self.dragged_rule_ui.rect.intersection(self.trash_sprite.rect):
-                self.rule_ui.pop(self.dragged_rule_ui.rule_num)
-
-                if self.dragged_rule_ui.rule_num == self.to_connect:
-                    self.to_connect = None
-
-                for connection in self.connections:
-                    if self.dragged_rule_ui.rule_num in connection[:2]:
-                        self.connections.remove(connection)
-
-                self.rule_space.remove(self.dragged_rule_ui)
-                del self.dragged_rule_ui
-
-            self.dragged_rule_ui = None
-
-            self.trigger_full_render()
-        else:
-            self.dragged_rule_ui = rule_ui
-
-    def get_rulesets(self): # return actions that can happen and the dependencies needed
-        do_blocks = [rule_ui for rule_ui in self.rule_ui.values() if rule_ui.rule_type == "do"]
-        
-        return [backtrace(do_block) for do_block in do_blocks]
+    def get_rulesets(self):
+        # TODO: remove this
+        return [], []
 
     def generate_pos(self):
         return random.randint(
@@ -500,78 +299,96 @@ class RuleUI(arcade.gui.UIAnchorLayout):
         ), random.randint(self.window.height * 0.1, int(self.window.height * 0.7))
 
     def add_rule(self, rule_type, force=None):
-        rule_box = RuleBox(
+        rule = force or generate_rule(rule_type)
+        rule_box = Block(
             *self.generate_pos(),
-            self.window.width * 0.15,
-            self.window.height * 0.15,
-            self.current_rule_num,
+            get_rule_description(rule_type, rule),
             rule_type,
-            force or generate_rule(rule_type),
+            rule,
+            self.current_rule_num,
+            {},
+            []
         )
-        if rule_type == "if":
-            rule_box.next_button.on_click = lambda event, rule_box=rule_box: self.connection(rule_box, ["do", "comparison"], 0)
-        elif rule_type == "comparison":
-            rule_box.previous_button_1.on_click = lambda event, rule_box=rule_box: self.connection(rule_box, ["if", "comparison"], 0)
-            rule_box.previous_button_2.on_click = lambda event, rule_box=rule_box: self.connection(rule_box, ["if", "comparison"], 1)
-            rule_box.next_button.on_click = lambda event, rule_box=rule_box: self.connection(rule_box, ["do", "comparison"], 2)
-        elif rule_type == "do":
-            rule_box.previous_button.on_click = lambda event, rule_box=rule_box: self.connection(rule_box, ["if", "comparison"], 0)
 
-        rule_box.drag_button.on_click = lambda event, rule_box=rule_box: self.drag(rule_box)
-
-        self.rule_space.add(rule_box)
-        self.rule_ui[self.current_rule_num] = rule_box
-        self.rule_ui[self.current_rule_num].fit_content()
-
+        self.rulesets[self.current_rule_num] = rule_box
         self.current_rule_num += 1
+        self.block_renderer.refresh()
 
         return rule_box
 
-    def create_connected_ruleset(self, rules, connections):
-        for rule_type, rule in rules:
-            self.add_rule(rule_type, rule)
-
-        for connection in connections:
-            self.set_previous(self.rule_ui[connection[0]], self.rule_ui[connection[1]], connection[2], connection[3])
-
-        self.connections.extend(connections)
-
     def draw(self):
-        self.bezier_points = []
+        self.block_renderer.draw()
 
-        for conn in self.connections:
-            start_id, end_id, start_conn_idx, end_conn_idx = conn
-            start_rule_ui = self.rule_ui[start_id]
-            end_rule_ui = self.rule_ui[end_id]
-
-            start_pos, start_dir_y = get_connection_pos(start_rule_ui, start_conn_idx)
-            end_pos, end_dir_y = get_connection_pos(end_rule_ui, end_conn_idx)
-
-            points = connection_between(start_pos, end_pos, start_dir_y, end_dir_y)
-            self.bezier_points.append(points)
-
-            arcade.draw_line_strip(points, arcade.color.WHITE, 6)
-
-        if self.to_connect is not None:
-            mouse_x, mouse_y = self.window.mouse.data.get("x", 0), self.window.mouse.data.get("y", 0)
-            start_pos, start_dir = get_connection_pos(self.rule_ui[self.to_connect], self.to_connect_idx)
-            end_pos, end_dir = (mouse_x, mouse_y), 1
-            points = connection_between(start_pos, end_pos, start_dir, end_dir)
-            arcade.draw_line_strip(points, arcade.color.WHITE, 6)
-
+    def draw_unproject(self):
         self.trash_spritelist.draw()
+
+    def drag_n_drop_check(self, blocks):
+        for block in blocks:
+            if block == self.dragged_rule_ui:
+                continue
+
+            if arcade.LBWH(block.x, block.y - 44, 280, 44).intersection(arcade.LBWH(self.dragged_rule_ui.x, self.dragged_rule_ui.y - 44, 280, 44)):
+                block.children.append(self.dragged_rule_ui)
+                del self.rulesets[self.dragged_rule_ui.rule_num]
+                self.block_renderer.refresh()
+                break
+            else:
+                self.drag_n_drop_check(block.children)
+
+    def remove_from_parent(self, block_to_remove, parents):
+        for parent in parents:
+            if block_to_remove in parent.children:
+                parent.children.remove(block_to_remove)
+                return True
+            if self.remove_from_parent(block_to_remove, parent.children):
+                return True
+        return False
+
+    def press_check(self, event, blocks):
+        for block in blocks:
+            if block == self.dragged_rule_ui:
+                continue
+
+            projected_vec = self.camera.unproject((event.x, event.y))
+            if arcade.LBWH(block.x, block.y - 44, 280, 44).point_in_rect((projected_vec.x, projected_vec.y)):
+                if block not in list(self.rulesets.values()):  # its children
+                    self.remove_from_parent(block, list(self.rulesets.values()))
+                    self.block_renderer.refresh()
+                self.dragged_rule_ui = block
+                break
+            else:
+                self.press_check(event, block.children)
 
     def on_event(self, event):
         super().on_event(event)
 
-        if isinstance(event, arcade.gui.UIMouseMovementEvent):
-            if self.dragged_rule_ui is not None:
-                self.dragged_rule_ui.center_x += event.dx
-                self.dragged_rule_ui.center_y += event.dy
+        if isinstance(event, arcade.gui.UIMouseDragEvent):
+            if event.buttons == arcade.MOUSE_BUTTON_LEFT:
+                if self.dragged_rule_ui is not None:
+                    self.dragged_rule_ui.x += event.dx
+                    self.dragged_rule_ui.y += event.dy
+                    self.block_renderer.move_block(event.dx, event.dy, self.dragged_rule_ui.rule_num)
+
+        elif isinstance(event, arcade.gui.UIMousePressEvent):
+            self.press_check(event, list(self.rulesets.values()))
+
+        elif isinstance(event, arcade.gui.UIMouseReleaseEvent):
+            if self.dragged_rule_ui:
+                block_vec = self.camera.unproject((self.dragged_rule_ui.x, self.dragged_rule_ui.y))
+                if self.trash_sprite.rect.intersection(arcade.LBWH(block_vec.x, block_vec.y, 280, 44)) and not self.trash_sprite._current_keyframe_index == self.trash_sprite.animation.num_frames - 1:
+                    del self.rulesets[self.dragged_rule_ui.rule_num]
+                    self.dragged_rule_ui = None
+                    self.block_renderer.refresh()
+                    return
+
+                self.drag_n_drop_check(list(self.rulesets.values()))
+
+            self.dragged_rule_ui = None
 
     def on_update(self, dt):
-        if self.dragged_rule_ui and self.trash_sprite.rect.intersection(self.dragged_rule_ui.rect):
-            if not self.trash_sprite._current_keyframe_index == self.trash_sprite.animation.num_frames - 1:
+        if self.dragged_rule_ui:
+            block_vec = self.camera.unproject((self.dragged_rule_ui.x, self.dragged_rule_ui.y))
+            if self.trash_sprite.rect.intersection(arcade.LBWH(block_vec.x, block_vec.y, 280, 44)) and not self.trash_sprite._current_keyframe_index == self.trash_sprite.animation.num_frames - 1:
                 self.trash_sprite.update_animation()
         else:
             self.trash_sprite.time = 0
