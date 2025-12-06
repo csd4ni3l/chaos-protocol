@@ -50,12 +50,13 @@ def connection_between(p0, p3, start_dir_y, end_dir_y):
 
 def connected_component(edges, start):
     graph = defaultdict(set)
-    for u, v in edges:
+    for u, v, _, __ in edges:
         graph[u].add(v)
         graph[v].add(u)
 
     seen = set([start])
     queue = deque([start])
+    connected_edges = []
 
     while queue:
         node = queue.popleft()
@@ -63,8 +64,11 @@ def connected_component(edges, start):
             if neighbor not in seen:
                 seen.add(neighbor)
                 queue.append(neighbor)
+                connected_edges.append((node, neighbor))
+            elif (neighbor, node) not in connected_edges and (node, neighbor) not in connected_edges:
+                connected_edges.append((node, neighbor))
 
-    return list(seen)
+    return connected_edges
 
 def get_rule_defaults(rule_type):
     if rule_type == "if":
@@ -101,6 +105,26 @@ def get_rule_defaults(rule_type):
             for rule_key, rule_dict in DO_RULES.items()
         }
 
+def backtrace(node: dict):
+    dependencies = []
+
+    for prev_node_list in node.previous.values():
+        for prev_node in prev_node_list:
+            if prev_node.rule_type == "comparison":
+                comparison_children = backtrace(prev_node)
+                dependencies.append([
+                    prev_node.rule_type, 
+                    prev_node.rule, 
+                    comparison_children,
+                    prev_node.rule_num
+                ])
+            elif prev_node.rule_type == "if":
+                dependencies.append([prev_node.rule_type, prev_node.rule, prev_node.rule_values, prev_node.rule_num])
+            elif prev_node.rule_type == "do":
+                dependencies.append([prev_node.rule_type, prev_node.rule, prev_node.rule_values, prev_node.rule_num])
+
+    return dependencies
+
 class RuleBox(arcade.gui.UIBoxLayout):
     def __init__(self, x, y, width, height, rule_num, rule_type, rule):
         super().__init__(space_between=5, x=x, y=y, width=width, height=height)
@@ -109,6 +133,8 @@ class RuleBox(arcade.gui.UIBoxLayout):
         self.rule_num = rule_num
         self.rule_type = rule_type
         self.initialize_rule()
+        
+        self.previous = {}
 
     def initialize_rule(self):
         if not self.rule_type == "comparison":
@@ -281,17 +307,20 @@ class RuleBox(arcade.gui.UIBoxLayout):
         self.clear()
         self.initialize_rule()
 
+    def __repr__(self):
+        return f"<{self.rule_type} ({self.rule}, {self.rule_num})>"
+
 def get_connection_pos(rule_ui: RuleBox, idx):
     if rule_ui.rule_type == "comparison":
-        if idx == 1:
+        if idx == 0:
             button = rule_ui.previous_button_1
             y = button.top
             direction = 1
-        elif idx == 2:
+        elif idx == 1:
             button = rule_ui.previous_button_2
             y = button.top
             direction = 1
-        else:
+        elif idx == 2:
             button = rule_ui.next_button
             y = button.bottom
             direction = -1
@@ -374,16 +403,49 @@ class RuleUI(arcade.gui.UIAnchorLayout):
 
         self.rule_space = self.add(arcade.gui.UIWidget(size_hint=(1, 1)))
 
-        # self.create_connected_ruleset([("if", "x_position_compare"), ("do", "move_x")])
+        self.create_connected_ruleset([
+            ("if", "x_position_compare"), 
+            ("if", "y_position_compare"),
+            ("comparison", "and"),
+            ("comparison", "and"),
+            ("do", "move_x")], 
+            [
+                [0, 2, 0, 0], # x_position_compare 0 -> first comparison 0
+                [1, 2, 0, 1], # y_position_compare 0 -> first comparison 1
+                [2, 3, 2, 0], # first comparison 2 (output) -> second comparison 0
+                [1, 3, 0, 1], # y_position_compare 0 -> -> second comparison 1
+                [3, 4, 2, 0] # second comparison 2 (output) -> do 
+            ]
+        )
 
         self.trash_spritelist = arcade.SpriteList()
         self.trash_sprite = trash_bin
         self.trash_sprite.position = (self.window.width * 0.9, self.window.height * 0.2)
         self.trash_spritelist.append(self.trash_sprite)
 
+    def set_previous(self, rule_ui_a, rule_ui_b, to_connect_idx, idx):
+        if rule_ui_a.rule_type == "if" and to_connect_idx == 0:
+            if idx not in rule_ui_b.previous:
+                rule_ui_b.previous[idx] = []
+            rule_ui_b.previous[idx].append(rule_ui_a)
+        elif rule_ui_a.rule_type == "comparison":
+            if to_connect_idx == 2:
+                if idx not in rule_ui_b.previous:
+                    rule_ui_b.previous[idx] = []
+                rule_ui_b.previous[idx].append(rule_ui_a)
+            else:
+                if to_connect_idx not in rule_ui_a.previous:
+                    rule_ui_a.previous[to_connect_idx] = []
+                rule_ui_a.previous[to_connect_idx].append(rule_ui_b)
+        elif rule_ui_a.rule_type == "do" and idx == 0:
+            if idx not in rule_ui_a.previous:
+                rule_ui_a.previous[0] = []
+            rule_ui_a.previous[0].append(rule_ui_b)
+
     def connection(self, rule_ui, allowed_next_connection, idx):
         if self.to_connect is not None:
-            old_rule_type = self.rule_ui[self.to_connect].rule_type
+            old_rule_ui = self.rule_ui[self.to_connect]
+            old_rule_type = old_rule_ui.rule_type
             if (
                     rule_ui.rule_type not in self.allowed_next_connection or
                     old_rule_type not in allowed_next_connection or 
@@ -395,6 +457,9 @@ class RuleUI(arcade.gui.UIAnchorLayout):
                 return
             
             self.connections.append([self.to_connect, rule_ui.rule_num, self.to_connect_idx, idx])
+
+            self.set_previous(old_rule_ui, rule_ui, self.to_connect_idx, idx)
+
             self.allowed_next_connection = None
             self.to_connect = None
             self.to_connect_idx = None
@@ -412,7 +477,7 @@ class RuleUI(arcade.gui.UIAnchorLayout):
                     self.to_connect = None
 
                 for connection in self.connections:
-                    if self.dragged_rule_ui.rule_num in connection:
+                    if self.dragged_rule_ui.rule_num in connection[:2]:
                         self.connections.remove(connection)
 
                 self.rule_space.remove(self.dragged_rule_ui)
@@ -424,12 +489,10 @@ class RuleUI(arcade.gui.UIAnchorLayout):
         else:
             self.dragged_rule_ui = rule_ui
 
-    def get_rulesets(self):
-        if self.connections:
-            components = connected_component(self.connections, 0)
-            print(components)
-
-        return {}
+    def get_rulesets(self): # return actions that can happen and the dependencies needed
+        do_blocks = [rule_ui for rule_ui in self.rule_ui.values() if rule_ui.rule_type == "do"]
+        
+        return [backtrace(do_block) for do_block in do_blocks]
 
     def generate_pos(self):
         return random.randint(
@@ -446,13 +509,13 @@ class RuleUI(arcade.gui.UIAnchorLayout):
             force or generate_rule(rule_type),
         )
         if rule_type == "if":
-            rule_box.next_button.on_click = lambda event, rule_box=rule_box: self.connection(rule_box, ["do", "comparison"], 1)
+            rule_box.next_button.on_click = lambda event, rule_box=rule_box: self.connection(rule_box, ["do", "comparison"], 0)
         elif rule_type == "comparison":
-            rule_box.previous_button_1.on_click = lambda event, rule_box=rule_box: self.connection(rule_box, ["if", "comparison"], 1)
-            rule_box.previous_button_2.on_click = lambda event, rule_box=rule_box: self.connection(rule_box, ["if", "comparison"], 2)
-            rule_box.next_button.on_click = lambda event, rule_box=rule_box: self.connection(rule_box, ["do", "comparison"], 3)
+            rule_box.previous_button_1.on_click = lambda event, rule_box=rule_box: self.connection(rule_box, ["if", "comparison"], 0)
+            rule_box.previous_button_2.on_click = lambda event, rule_box=rule_box: self.connection(rule_box, ["if", "comparison"], 1)
+            rule_box.next_button.on_click = lambda event, rule_box=rule_box: self.connection(rule_box, ["do", "comparison"], 2)
         elif rule_type == "do":
-            rule_box.previous_button.on_click = lambda event, rule_box=rule_box: self.connection(rule_box, ["if", "comparison"], 1)
+            rule_box.previous_button.on_click = lambda event, rule_box=rule_box: self.connection(rule_box, ["if", "comparison"], 0)
 
         rule_box.drag_button.on_click = lambda event, rule_box=rule_box: self.drag(rule_box)
 
@@ -464,16 +527,14 @@ class RuleUI(arcade.gui.UIAnchorLayout):
 
         return rule_box
 
-    def create_connected_ruleset(self, rules):
-        previous = None
-
+    def create_connected_ruleset(self, rules, connections):
         for rule_type, rule in rules:
-            rule_box = self.add_rule(rule_type, rule)
+            self.add_rule(rule_type, rule)
 
-            if previous:
-                self.connections.append((previous.rule_num, rule_box.rule_num))
+        for connection in connections:
+            self.set_previous(self.rule_ui[connection[0]], self.rule_ui[connection[1]], connection[2], connection[3])
 
-            previous = rule_box
+        self.connections.extend(connections)
 
     def draw(self):
         self.bezier_points = []
@@ -509,7 +570,7 @@ class RuleUI(arcade.gui.UIAnchorLayout):
                 self.dragged_rule_ui.center_y += event.dy
 
     def on_update(self, dt):
-        if self.dragged_rule_ui and self.trash_sprite.rect.point_in_rect((self.window.mouse.data["x"], self.window.mouse.data["y"])):
+        if self.dragged_rule_ui and self.trash_sprite.rect.intersection(self.dragged_rule_ui.rect):
             if not self.trash_sprite._current_keyframe_index == self.trash_sprite.animation.num_frames - 1:
                 self.trash_sprite.update_animation()
         else:

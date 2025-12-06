@@ -176,13 +176,13 @@ class Game(arcade.gui.UIView):
 
         self.triggered_events.append(["game_launch", {}])
 
-    def get_rule_values(self, ruleset_num, rule_num, rule_dict, event_args):
-        args = [self.rule_values[f"{ruleset_num}_{rule_num}_{user_var}_{n}"] for n, user_var in enumerate(rule_dict["user_vars"])]
+    def get_rule_values(self, rule_num, rule_dict, rule_values, event_args):
+        args = [rule_values[f"{rule_num}_{user_var}_{n}"] for n, user_var in enumerate(rule_dict["user_vars"])]
 
         return args + [event_args[var] for var in rule_dict.get("vars", []) if not var in rule_dict["user_vars"]]
 
-    def check_rule(self, ruleset_num, rule_num, rule_dict, event_args):
-        return rule_dict["func"](*self.get_rule_values(ruleset_num, rule_num, rule_dict, event_args))
+    def check_rule(self, rule_num, rule_dict, rule_values, event_args):
+        return rule_dict["func"](*self.get_rule_values(rule_num, rule_dict, rule_values, event_args))
     
     def get_action_function(self, action_dict):
         ACTION_FUNCTION_DICT = {
@@ -207,8 +207,8 @@ class Game(arcade.gui.UIView):
 
         return ACTION_FUNCTION_DICT[action_dict["type"]][action_dict["name"]]
 
-    def run_do_rule(self, ruleset_num, rule_num, rule_dict, event_args):
-        self.get_action_function(rule_dict["action"])(*self.get_rule_values(ruleset_num, rule_num, rule_dict, event_args))
+    def run_do_rule(self, rule_num, rule_dict, rule_values, event_args):
+        self.get_action_function(rule_dict["action"])(*self.get_rule_values(rule_num, rule_dict, rule_values, event_args))
 
     def on_update(self, delta_time):
         if self.mode == "import" and self.file_manager.submitted_content:
@@ -238,57 +238,9 @@ class Game(arcade.gui.UIView):
 
         while len(self.triggered_events) > 0:
             trigger, trigger_args = self.triggered_events.pop(0)
-            for key, ruleset in self.rulesets.items():
-                if len(ruleset) == 2:
-                    if_rule_dict = IF_RULES[ruleset[0]]
-                    do_rule_dict = DO_RULES[ruleset[1]]
 
-                    if not if_rule_dict["trigger"] == trigger:
-                        continue
-                    
-                    if do_rule_dict["action"]["type"] == "shape_action" or "shape_type" in if_rule_dict["user_vars"]:
-                        for shape in self.shapes:                            
-                            event_args = trigger_args.copy()
-                            if not "event_shape_type" in trigger_args:
-                                event_args.update({"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.shape_color})
-
-                            if self.check_rule(key, 1, if_rule_dict, event_args):
-                                self.run_do_rule(key, 2, do_rule_dict, event_args)
-                    else:
-                        event_args = trigger_args.copy()
-                        if self.check_rule(key, 1, if_rule_dict, event_args):
-                            self.run_do_rule(key, 2, do_rule_dict, event_args)
-                    
-                else:
-                    if_rule_dicts = IF_RULES[ruleset[0]], IF_RULES[ruleset[2]]
-                    do_rule_dict = DO_RULES[ruleset[3]]
-
-                    if not (if_rule_dicts[0]["trigger"] == trigger and if_rule_dicts[0]["trigger"] == trigger):
-                        continue
-
-                    if do_rule_dict["action"]["type"] == "shape_action":
-                        for shape in self.shapes:
-                            event_args = trigger_args
-                            
-                            if not "event_shape_type" in trigger_args:
-                                event_args.update({"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.shape_color})
-
-                            if ruleset[1] == "and":
-                                if self.check_rule(key, 1, if_rule_dicts[0], event_args) and self.check_rule(key, 2, if_rule_dicts[1], event_args):
-                                    self.run_do_rule(key, 3, do_rule_dict, event_args)
-
-                            elif ruleset[1] == "or":
-                                if self.check_rule(key, 1, if_rule_dicts[0], event_args) or self.check_rule(key, 2, if_rule_dicts[1], event_args):
-                                    self.run_do_rule(key, 3, do_rule_dict, event_args)
-                    else:
-                        event_args = trigger_args
-                        if ruleset[1] == "and":
-                            if self.check_rule(key, 1, if_rule_dicts[0], event_args) and self.check_rule(key, 2, if_rule_dicts[1], event_args):
-                                self.run_do_rule(key, 3, do_rule_dict, event_args)
-
-                        elif ruleset[1] == "or":
-                            if self.check_rule(key, 1, if_rule_dicts[0], event_args) or self.check_rule(key, 2, if_rule_dicts[1], event_args):
-                                self.run_do_rule(key, 3, do_rule_dict, event_args)
+            for rule in self.rulesets:
+                ...
 
         for shape in self.shapes:
             for shape_b in self.shapes:
