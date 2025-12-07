@@ -1,9 +1,11 @@
 import arcade, arcade.gui, pyglet, random, json
 
+from dataclasses import asdict
+
 from utils.preload import SPRITE_TEXTURES, button_texture, button_hovered_texture
 from utils.constants import button_style, DO_RULES, IF_RULES, SHAPES, ALLOWED_INPUT
 
-from game.rules import RuleUI
+from game.rules import RuleUI, Block, VarBlock
 from game.sprites import BaseShape, Rectangle, Circle, Triangle
 from game.file_manager import FileManager
 
@@ -35,9 +37,10 @@ class Game(arcade.gui.UIView):
         self.y_gravity = self.settings.get("default_y_gravity", 5)
         self.triggered_events = []
 
-        self.rulesets, self.if_rules = self.rules_box.get_rulesets()
+        self.rulesets = self.rules_box.rulesets
 
         self.sprites_box = arcade.gui.UIAnchorLayout(size_hint=(0.95, 0.9))
+        self.sprite_types = SHAPES
 
         self.shapes = []
         self.shape_batch = pyglet.graphics.Batch()
@@ -174,15 +177,17 @@ class Game(arcade.gui.UIView):
             box.add(arcade.gui.UILabel(text=shape, font_size=16, text_color=arcade.color.WHITE))
             box.add(arcade.gui.UIImage(texture=SPRITE_TEXTURES[shape], width=self.window.width / 15, height=self.window.width / 15))
 
-        self.triggered_events.append(["game_launch", {}])
+        self.sprites_box.add(arcade.gui.UITextureButton(text="Add Sprite", width=self.window.width / 2, height=self.window.height / 10, texture=button_texture, texture_hovered=button_hovered_texture, style=button_style))
 
-    def get_rule_values(self, rule_dict, rule_values, event_args):
-        args = [rule_values[f"{user_var}_{n}"] for n, user_var in enumerate(rule_dict["user_vars"])]
+        self.triggered_events.append(["start", {}])
+
+    def get_vars(self, rule_dict, vars, event_args):
+        args = [vars[n].value for n in range(len(rule_dict["user_vars"]))]
 
         return args + [event_args[var] for var in rule_dict.get("vars", []) if not var in rule_dict["user_vars"]]
 
-    def check_rule(self, rule_dict, rule_values, event_args):
-        return rule_dict["func"](*self.get_rule_values(rule_dict, rule_values, event_args))
+    def check_rule(self, rule_dict, vars, event_args):
+        return rule_dict["func"](*self.get_vars(rule_dict, vars, event_args))
     
     def get_action_function(self, action_dict):
         ACTION_FUNCTION_DICT = {
@@ -207,29 +212,69 @@ class Game(arcade.gui.UIView):
 
         return ACTION_FUNCTION_DICT[action_dict["type"]][action_dict["name"]]
 
-    def run_do_rule(self, rule_dict, rule_values, event_args):
-        self.get_action_function(rule_dict["action"])(*self.get_rule_values(rule_dict, rule_values, event_args))
+    def run_do_rule(self, rule_dict, vars, event_args):
+        self.get_action_function(rule_dict["action"])(*self.get_vars(rule_dict, vars, event_args))
+
+    def recursive_execute_rule(self, rule, trigger_args):
+        for child_rule in rule.children:
+            child_rule_type = child_rule.rule_type
+
+            if child_rule_type == "for": # TODO: Extend this when i add more FOR loop types
+                if child_rule.rule == "every_shape":
+                    for shape in self.shapes:
+                        event_args = trigger_args.copy()
+                        event_args.update({"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.shape_color})
+                        
+                        self.recursive_execute_rule(child_rule, event_args)
+                
+            elif child_rule_type == "if":
+                if self.check_rule(IF_RULES[child_rule.rule], child_rule.vars, trigger_args):
+                    self.recursive_execute_rule(child_rule, trigger_args)
+
+            elif child_rule_type == "do":
+                self.run_do_rule(DO_RULES[child_rule.rule], child_rule.vars, trigger_args)
+
+    def get_max_rule_num(self):
+        max_num = -1
+        
+        def recurse(block: Block):
+            nonlocal max_num
+            max_num = max(max_num, block.rule_num)
+            for child in block.children:
+                recurse(child)
+        
+        for block in self.rulesets.values():
+            recurse(block)
+        
+        return max_num
 
     def on_update(self, delta_time):
         if self.mode == "import" and self.file_manager.submitted_content:
             with open(self.file_manager.submitted_content, "r") as file:
                 data = json.load(file)
 
-            if not data or not "rulesets" in data or not "rule_values" in data:
-                self.add_widget(arcade.gui.UIMessageBox(message_text="Invalid file. Could not import rules.", width=self.window.width * 0.5, height=self.window.height * 0.25))
-                return
-
-            self.rule_values = data["rule_values"]
             self.triggered_events = []
 
-            # TODO: add rule loading here
+            if not data:
+                self.add_widget(arcade.gui.UIMessageBox(message_text="Invalid file. Could not import rules.", width=self.window.width * 0.5, height=self.window.height * 0.25))
+                return
+            
+            for rule_num, ruleset in data.items():
+                kwargs = ruleset
+                kwargs["children"] = [Block(**child) for child in ruleset["children"]]
+                kwargs["vars"] = [VarBlock(**var) for var in ruleset["vars"]]
+                block = Block(**kwargs)
+                self.rulesets[rule_num] = block
+            
+            self.rules_box.rulesets = self.rulesets
+            self.rules_box.current_rule_num = self.get_max_rule_num() + 1
+            self.rules_box.block_renderer.refresh()
+
+            self.rules()
 
         if self.mode == "export" and self.file_manager.submitted_content:            
             with open(self.file_manager.submitted_content, "w") as file:
-                file.write(json.dumps({
-                    "rulesets": self.rulesets,
-                    "rule_values": self.rule_values
-                }, indent=4))
+                file.write(json.dumps({rule_num: asdict(block) for rule_num, block in self.rulesets.items()}, indent=4))
 
         if not self.mode == "simulation":
             return
@@ -239,31 +284,11 @@ class Game(arcade.gui.UIView):
         while len(self.triggered_events) > 0:
             trigger, trigger_args = self.triggered_events.pop(0)
 
-            # In the new version, a DO rule's dependencies are the ruleset itself which trigger it
-            # Since there could be multiple IFs that depend on each other, we need to get the entrypoint values first and then interpret the tree.
-            event_args = trigger_args
-
-            if_rule_values = {}
-
-            for if_rule in self.if_rules:
-                if_rule_dict = IF_RULES[if_rule[0]]
-                if "shape_type" in if_rule_dict["user_vars"]:
-                    is_true = False
-                    for shape in self.shapes:
-                        if is_true:
-                            break
-
-                        event_args = trigger_args.copy()
-                        if not "event_shape_type" in trigger_args:
-                            event_args.update({"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.shape_color})
-                        
-                        is_true = self.check_rule(if_rule_dict, if_rule[1], trigger_args)
-
-                    if_rule_values[if_rule[2]] = is_true
-
-                else:
-                    event_args = trigger_args.copy()
-                    if_rule_values[if_rule[2]] = self.check_rule(if_rule_dict, if_rule[1], trigger_args)
+            for rule_num, rule in self.rulesets.items():
+                if not rule.rule_type == "trigger" or not trigger == rule.rule:
+                    continue
+                
+                self.recursive_execute_rule(rule, trigger_args)
 
         for shape in self.shapes:
             for shape_b in self.shapes:
@@ -350,8 +375,10 @@ class Game(arcade.gui.UIView):
 
     def simulation(self):
         self.disable_previous()
-        
-        self.rulesets, self.if_rules = self.rules_box.get_rulesets()
+        self.x_gravity = self.settings.get("default_x_gravity", 0)
+        self.y_gravity = self.settings.get("default_y_gravity", 5)
+        self.triggered_events = []
+        self.rulesets = self.rules_box.rulesets
         self.mode = "simulation"
 
     def main_exit(self):
