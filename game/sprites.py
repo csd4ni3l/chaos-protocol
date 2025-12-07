@@ -106,12 +106,11 @@ class Circle(pyglet.shapes.Circle, BaseShape):
         
         return not (has_neg and has_pos)
 
-class Rectangle(pyglet.shapes.Rectangle, BaseShape):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        BaseShape.__init__(self)
-        self.shape_type = "rectangle"
-    
+
+class BaseRectangle(BaseShape):
+    def __init__(self):
+        super().__init__()
+
     @property
     def shape_size(self):
         return self.width
@@ -180,6 +179,18 @@ class Rectangle(pyglet.shapes.Rectangle, BaseShape):
         
         return (ccw(x1, y1, x3, y3, x4, y4) != ccw(x2, y2, x3, y3, x4, y4) and
                 ccw(x1, y1, x2, y2, x3, y3) != ccw(x1, y1, x2, y2, x4, y4))
+
+class Rectangle(pyglet.shapes.Rectangle, BaseRectangle):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        BaseRectangle.__init__(self)
+        self.shape_type = "rectangle"
+
+class TexturedRectangle(pyglet.sprite.Sprite, BaseRectangle):
+    def __init__(self, shape_type, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        BaseRectangle.__init__(self)
+        self.shape_type = shape_type
 
 class Triangle(pyglet.shapes.Triangle, BaseShape):
     def __init__(self, *args, **kwargs):

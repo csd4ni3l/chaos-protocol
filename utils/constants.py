@@ -1,12 +1,21 @@
+import os
 import arcade.color, operator
 from arcade.types import Color
 from arcade.gui.widgets.buttons import UITextureButtonStyle, UIFlatButtonStyle
 from arcade.gui.widgets.slider import UISliderStyle
 
-SHAPES = ["rectangle", "circle", "triangle"]
+# Get the directory where this module is located
+_module_dir = os.path.dirname(os.path.abspath(__file__))
+_assets_dir = os.path.join(os.path.dirname(_module_dir), 'assets')
+
+SPRITES = {
+            os.path.splitext(file_name)[0]: os.path.join(_assets_dir, 'graphics', 'sprites', file_name) 
+            for file_name in os.listdir(os.path.join(_assets_dir, 'graphics', 'sprites'))
+        }
+
 VAR_NAMES = ["a", "b", "c", "d", "e", "f", "g"]
 
-ALLOWED_INPUT = ["a", "b", "c", "d", "e", "q", "w", "s", "t"]
+ALLOWED_INPUT = ["a", "b", "c", "d", "e", "q", "w", "s", "t", "space", "left", "right", "up", "down"]
 
 TRIGGER_COLOR = (255, 204, 102)
 DO_COLOR = (102, 178, 255)
@@ -39,8 +48,8 @@ OPS = {
 }
 
 VAR_DEFAULT = {
-    "shape_type": SHAPES[0],
-    "target_type": SHAPES[1],
+    "shape_type": "rectangle",
+    "target_type": "circle",
     "variable": 0,
     "color": "WHITE",
     "size": 10,
@@ -49,8 +58,8 @@ VAR_DEFAULT = {
 }
 
 VAR_OPTIONS = {
-    "shape_type": SHAPES,
-    "target_type": SHAPES,
+    "shape_type": SPRITES,
+    "target_type": SPRITES,
     "variable": (-700, 700),
     "color": COLORS,
     "size": (1, 200),
@@ -117,13 +126,6 @@ TRIGGER_RULES = {
         "user_vars": ["shape_type"],
         "vars": ["shape_type", "event_shape_type"],
         "func": lambda *v: v[0] == v[1]
-    },
-    "morphs": {
-        "key": "morphs",
-        "description": "IF {a} shape morphs into {b}",
-        "user_vars": ["shape_type", "target_type"],
-        "vars": ["shape_type", "target_type", "event_a_type", "event_b_type"],
-        "func": lambda *v: (v[0] == v[2]) and (v[3] == v[1])
     },
     "collides": {
         "key": "collides",
@@ -289,14 +291,6 @@ DO_RULES = {
         "vars": ["shape"]
     },
 
-    "morph_into": {
-        "key": "morph_into",
-        "description": "Morph this into {a}",
-        "action": {"type": "shape_action", "name": "morph"},
-        "user_vars": ["shape_type"],
-        "vars": ["shape", "shape_type"]
-    },
-
     "change_x_gravity": {
         "key": "change_x_gravity",
         "description": "Change X gravity to {a}",
@@ -327,7 +321,6 @@ PROVIDES_SHAPE = [
     "spawns",
     "color_changes",
     "size_changes",
-    "morphs",
     "collides",
 
     # IFs, technically, these need and provide a shape to the next rule
@@ -362,7 +355,6 @@ NEEDS_SHAPE = [
     "change_y_velocity",
     "change_size",
     "destroy",
-    "morph_into"
 ]
 
 RULE_DEFAULTS = {

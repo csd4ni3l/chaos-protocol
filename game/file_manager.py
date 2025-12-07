@@ -6,10 +6,11 @@ from utils.preload import button_texture, button_hovered_texture
 from arcade.gui.experimental.scroll_area import UIScrollArea, UIScrollBar
 
 class FileManager(arcade.gui.UIAnchorLayout):
-    def __init__(self, width, allowed_extensions):
-        super().__init__(size_hint=(0.95, 0.875), vertical=False)
+    def __init__(self, width, height, size_hint, allowed_extensions):
+        super().__init__(size_hint=size_hint, vertical=False)
 
         self.filemanager_width = width
+        self.filemanager_height = height
 
         self.current_directory = os.path.expanduser("~")
         self.allowed_extensions = allowed_extensions
@@ -36,9 +37,9 @@ class FileManager(arcade.gui.UIAnchorLayout):
         self.bottom_box = self.add(arcade.gui.UIBoxLayout(space_between=5), anchor_x="center", anchor_y="bottom", align_y=5)
 
         self.filename_label = self.bottom_box.add(arcade.gui.UILabel(text="Filename:", font_name="Roboto", font_size=17))
-        self.filename_input = self.bottom_box.add(arcade.gui.UIInputText(width=self.filemanager_width * 0.35, height=self.filemanager_width * 0.02).with_border(color=arcade.color.WHITE))
+        self.filename_input = self.bottom_box.add(arcade.gui.UIInputText(width=self.filemanager_width * 0.35, height=self.filemanager_height * 0.05).with_border(color=arcade.color.WHITE))
         
-        self.submit_button = self.bottom_box.add(arcade.gui.UITextureButton(texture=button_texture, texture_hovered=button_hovered_texture, text="Submit", style=button_style, width=self.filemanager_width * 0.5, height=self.filemanager_width * 0.025))
+        self.submit_button = self.bottom_box.add(arcade.gui.UITextureButton(texture=button_texture, texture_hovered=button_hovered_texture, text="Submit", style=button_style, width=self.filemanager_width * 0.5, height=self.filemanager_height * 0.05))
         self.submit_button.on_click = lambda event: self.submit(self.current_directory)
 
         self.submit_button.visible = False
@@ -55,9 +56,7 @@ class FileManager(arcade.gui.UIAnchorLayout):
 
     def submit(self, content):
         self.submitted_content = content if self.mode == "import" else f"{content}/{self.filename_input.text}"
-
-        self.disable()
-
+        
     def get_content(self, directory):
         if not directory in self.content_cache or time.perf_counter() - self.content_cache[directory][-1] >= 30:
             try:
@@ -109,18 +108,15 @@ class FileManager(arcade.gui.UIAnchorLayout):
 
         self.current_directory_label.text = self.current_directory
 
-        self.file_buttons.append(self.files_box.add(arcade.gui.UITextureButton(texture=button_texture, texture_hovered=button_hovered_texture, text="Go up", style=button_style, width=self.filemanager_width / 1.5)))
+        self.file_buttons.append(self.files_box.add(arcade.gui.UITextureButton(texture=button_texture, texture_hovered=button_hovered_texture, text="Go up", style=button_style, width=self.filemanager_width / 1.5, height=self.filemanager_height * 0.05,)))
         self.file_buttons[-1].on_click = lambda event, directory=self.current_directory: self.change_directory(os.path.dirname(directory))
 
         for file in self.get_content(self.current_directory):
-            self.file_buttons.append(self.files_box.add(arcade.gui.UITextureButton(texture=button_texture, texture_hovered=button_hovered_texture, text=file, style=button_style, width=self.filemanager_width / 1.5)))
+            self.file_buttons.append(self.files_box.add(arcade.gui.UITextureButton(texture=button_texture, texture_hovered=button_hovered_texture, text=file, style=button_style, width=self.filemanager_width / 1.5, height=self.filemanager_height * 0.05,)))
             if os.path.isdir(f"{self.current_directory}/{file}"):
                 self.file_buttons[-1].on_click = lambda event, directory=f"{self.current_directory}/{file}": self.change_directory(directory)
             else:
                 self.file_buttons[-1].on_click = lambda event, file=f"{self.current_directory}/{file}": self.submit(file)
-
-    def disable(self):
-        self.parent.parent.disable() # The FileManager UIManager. self.parent is the FileManager UIAnchorLayout
 
     def change_directory(self, directory):
         if directory.startswith("//"): # Fix / paths

@@ -124,10 +124,10 @@ class BlockRenderer:
     def _build_block_with_vars(self, b: Block, x: int, y: int) -> None:
         lx, ly = x, y - 42
         
-        current_x = lx + 10
+        current_x = lx + 14
         current_y = ly + 28
         
-        pattern = r' ([a-z]) '
+        pattern = r'(?:^| )([a-z])(?= |$)'
         parts = re.split(pattern, b.label)
         
         var_index = 0
@@ -145,19 +145,19 @@ class BlockRenderer:
                     self.text_objects.append(text_obj)
                     self.text_by_rule_num[b.rule_num].append(text_obj)
                     
-                    current_x += len(part) * 10
+                    current_x += len(part) * 12
             else:
                 if var_index < len(b.vars):
                     var = b.vars[var_index]
                     var_width, var_height = self._build_var_ui(
                         var, current_x, current_y, b.rule_num
                     )
-                    current_x += var_width + 7
+                    current_x += var_width + 10
                     var_index += 1
 
     def _build_block(self, b: Block, x: int, y: int) -> int:
         is_wrap = b.rule_type != "do"
-        h, w = 42, 280
+        h, w = 42, 380
 
         if b.rule_type == "if":
             color = IF_COLOR
@@ -467,7 +467,7 @@ class RuleUI(arcade.gui.UIAnchorLayout):
             if block == self.dragged_rule_ui or (self.dragged_rule_ui.rule in NEEDS_SHAPE and block.rule not in PROVIDES_SHAPE):
                 continue
 
-            if arcade.LBWH(block.x, block.y - 44, 280, 44).intersection(arcade.LBWH(self.dragged_rule_ui.x, self.dragged_rule_ui.y - 44, 280, 44)):
+            if arcade.LBWH(block.x, block.y - 44, 380, 44).intersection(arcade.LBWH(self.dragged_rule_ui.x, self.dragged_rule_ui.y - 44, 380, 44)):
                 block.children.append(self.dragged_rule_ui)
                 del self.rulesets[self.dragged_rule_ui.rule_num]
                 self.block_renderer.refresh()
@@ -491,7 +491,7 @@ class RuleUI(arcade.gui.UIAnchorLayout):
                 continue
 
             projected_vec = self.camera.unproject((event.x, event.y))
-            if arcade.LBWH(block.x, block.y - 44, 280, 44).point_in_rect((projected_vec.x, projected_vec.y)):
+            if arcade.LBWH(block.x, block.y - 44, 380, 44).point_in_rect((projected_vec.x, projected_vec.y)):
                 if block not in list(self.rulesets.values()):  # its children
                     self.remove_from_parent(block, list(self.rulesets.values()))
                     self.block_renderer.refresh()
@@ -526,9 +526,22 @@ class RuleUI(arcade.gui.UIAnchorLayout):
 
         elif isinstance(event, arcade.gui.UIMouseReleaseEvent):
             if self.dragged_rule_ui:
-                block_vec = self.camera.unproject((self.dragged_rule_ui.x, self.dragged_rule_ui.y))
-                if self.trash_sprite.rect.intersection(arcade.LBWH(block_vec.x, block_vec.y, 280, 44)) and not self.trash_sprite._current_keyframe_index == self.trash_sprite.animation.num_frames - 1:
-                    del self.rulesets[self.dragged_rule_ui.rule_num]
+                block_screen_pos = self.camera.project((self.dragged_rule_ui.x, self.dragged_rule_ui.y))
+                
+                block_rect = arcade.LBWH(block_screen_pos[0], block_screen_pos[1], 380, 44)
+                trash_rect = arcade.LBWH(
+                    self.trash_sprite.center_x - self.trash_sprite.width / 2,
+                    self.trash_sprite.center_y - self.trash_sprite.height / 2,
+                    self.trash_sprite.width,
+                    self.trash_sprite.height
+                )
+                
+                if block_rect.intersection(trash_rect):
+                    self.remove_from_parent(self.dragged_rule_ui, list(self.rulesets.values()))
+                    
+                    if self.dragged_rule_ui.rule_num in self.rulesets:
+                        del self.rulesets[self.dragged_rule_ui.rule_num]
+
                     self.dragged_rule_ui = None
                     self.block_renderer.refresh()
                     return
@@ -556,8 +569,8 @@ class RuleUI(arcade.gui.UIAnchorLayout):
 
     def on_update(self, dt):
         if self.dragged_rule_ui:
-            block_vec = self.camera.unproject((self.dragged_rule_ui.x, self.dragged_rule_ui.y))
-            if self.trash_sprite.rect.intersection(arcade.LBWH(block_vec.x, block_vec.y, 280, 44)) and not self.trash_sprite._current_keyframe_index == self.trash_sprite.animation.num_frames - 1:
+            block_screen_pos = self.camera.project((self.dragged_rule_ui.x, self.dragged_rule_ui.y))
+            if self.trash_sprite.rect.intersection(arcade.LBWH(block_screen_pos[0], block_screen_pos[1], 380, 44)) and not self.trash_sprite._current_keyframe_index == self.trash_sprite.animation.num_frames - 1:
                 self.trash_sprite.update_animation()
         else:
             self.trash_sprite.time = 0

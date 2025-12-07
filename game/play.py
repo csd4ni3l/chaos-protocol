@@ -3,10 +3,10 @@ import arcade, arcade.gui, pyglet, random, json
 from dataclasses import asdict
 
 from utils.preload import SPRITE_TEXTURES, button_texture, button_hovered_texture
-from utils.constants import button_style, DO_RULES, IF_RULES, SHAPES, ALLOWED_INPUT
+from utils.constants import button_style, DO_RULES, IF_RULES, SPRITES, ALLOWED_INPUT
 
 from game.rules import RuleUI, Block, VarBlock
-from game.sprites import BaseShape, Rectangle, Circle, Triangle
+from game.sprites import BaseShape, Rectangle, Circle, Triangle, TexturedRectangle
 from game.file_manager import FileManager
 
 class Game(arcade.gui.UIView):
@@ -23,7 +23,7 @@ class Game(arcade.gui.UIView):
 
         self.rules_box = RuleUI(self.window)
 
-        self.file_manager = FileManager(self.window.width * 0.95, [".json"]).with_border()
+        self.file_manager = FileManager(self.window.width * 0.95, self.window.height * 0.875, (0.95, 0.875), [".json"]).with_border()
 
         self.ui_selector_box = self.anchor.add(arcade.gui.UIBoxLayout(vertical=False, space_between=self.window.width / 100), anchor_x="left", anchor_y="bottom", align_y=5, align_x=self.window.width / 100)
         self.add_ui_selector("Simulation", lambda event: self.simulation())
@@ -39,8 +39,18 @@ class Game(arcade.gui.UIView):
 
         self.rulesets = self.rules_box.rulesets
 
-        self.sprites_box = arcade.gui.UIAnchorLayout(size_hint=(0.95, 0.9))
-        self.sprite_types = SHAPES
+        self.sprite_add_filemanager = FileManager(self.window.width * 0.9, self.window.height * 0.75, (0.9, 0.75), [".png", ".jpg", ".jpeg", ".bmp", ".gif"])
+        self.sprite_add_ui = arcade.gui.UIBoxLayout(size_hint=(0.95, 0.9), space_between=10)
+        self.sprite_add_ui.add(arcade.gui.UILabel(text="Add Sprite", font_size=24, text_color=arcade.color.WHITE))
+        
+        self.sprite_add_ui.add(arcade.gui.UILabel(text="Sprite Name:", font_size=18, text_color=arcade.color.WHITE))
+        self.sprite_name_input = self.sprite_add_ui.add(arcade.gui.UIInputText(width=self.window.width * 0.4, height=self.window.height * 0.05).with_border(color=arcade.color.WHITE))
+
+        self.sprite_add_ui.add(arcade.gui.UILabel(text="Select a texture for the sprite:", font_size=18, text_color=arcade.color.WHITE))
+        self.sprite_add_ui.add(self.sprite_add_filemanager, anchor_x="center", anchor_y="bottom", align_y=25)
+
+        self.sprites_ui = arcade.gui.UIAnchorLayout(size_hint=(0.95, 0.9))
+        self.sprite_types = SPRITES
 
         self.shapes = []
         self.shape_batch = pyglet.graphics.Batch()
@@ -52,6 +62,7 @@ class Game(arcade.gui.UIView):
         button.on_click = on_click
 
     def move_x(self, a, shape):
+        a = float(a)
         if isinstance(shape, Triangle):
             shape.x += a
             shape.x2 += a
@@ -60,6 +71,7 @@ class Game(arcade.gui.UIView):
             shape.x += a
 
     def move_y(self, a, shape):
+        a = float(a)
         if isinstance(shape, Triangle):
             shape.y += a
             shape.y2 += a
@@ -68,6 +80,7 @@ class Game(arcade.gui.UIView):
             shape.y += a
 
     def change_x(self, a, shape):
+        a = float(a)
         if isinstance(shape, Triangle):
             offset_x2 = shape.x2 - shape.x
             offset_x3 = shape.x3 - shape.x
@@ -79,6 +92,7 @@ class Game(arcade.gui.UIView):
             shape.x = a
     
     def change_y(self, a, shape):
+        a = float(a)
         if isinstance(shape, Triangle):
             offset_y2 = shape.y2 - shape.y
             offset_y3 = shape.y3 - shape.y
@@ -90,18 +104,22 @@ class Game(arcade.gui.UIView):
             shape.y = a
 
     def change_x_velocity(self, a, shape):
+        a = float(a)
         shape.x_velocity = a
         self.triggered_events.append(["x_velocity_change", {"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.shape_color}])
 
     def change_y_velocity(self, a, shape):
+        a = float(a)
         shape.y_velocity = a
         self.triggered_events.append(["y_velocity_change", {"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.shape_color}])
 
     def change_x_gravity(self, a):
+        a = float(a)
         self.x_gravity = a
         self.triggered_events.append(["x_gravity_change", {}])
 
     def change_y_gravity(self, a):
+        a = float(a)
         self.y_gravity = a
         self.triggered_events.append(["y_gravity_change", {}])
 
@@ -116,6 +134,7 @@ class Game(arcade.gui.UIView):
             shape.delete()
 
     def change_size(self, a, shape):
+        a = float(a)
         if isinstance(shape, Circle):
             shape.radius = a
         elif isinstance(shape, Rectangle):
@@ -146,38 +165,56 @@ class Game(arcade.gui.UIView):
             
         elif shape_type == "triangle":
             self.shapes.append(Triangle(x, y, x + 10, y, x + 5, y + 10, color=arcade.color.WHITE, batch=self.shape_batch))
+        
+        else:
+            self.shapes.append(TexturedRectangle(shape_type, img=SPRITE_TEXTURES.get(shape_type, SPRITE_TEXTURES["rectangle"]), x=x, y=y, batch=self.shape_batch))
 
         shape = self.shapes[-1]
 
         self.triggered_events.append(["spawn", {"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.shape_color}])
 
-    def morph(self, a, shape):
-        old_shape_x, old_shape_y, old_shape_size, old_shape_color = shape.x, shape.y, shape.shape_size, shape.shape_color
-        self.destroy(shape)
+    def add_sprite(self):
+        self.disable_previous()
 
-        if a == "circle":
-            self.shapes.append(Circle(old_shape_x, old_shape_y, old_shape_size, color=getattr(arcade.color, old_shape_color), batch=self.shape_batch))
+        self.mode = "sprite_add"
 
-        elif a == "rectangle":
-            self.shapes.append(Rectangle(old_shape_x, old_shape_y, width=old_shape_size, height=old_shape_size, color=getattr(arcade.color, old_shape_color), batch=self.shape_batch))
-            
-        elif a == "triangle":
-            self.shapes.append(Triangle(old_shape_x, old_shape_y, old_shape_x + old_shape_size, old_shape_y, old_shape_x + int(old_shape_size / 2), old_shape_y + old_shape_size, color=getattr(arcade.color, old_shape_color), batch=self.shape_batch))
+        self.anchor.add(self.sprite_add_ui, anchor_x="center", anchor_y="center")
+
+        def check_selection(delta_time):
+            if self.sprite_add_filemanager.submitted_content:
+                texture = arcade.load_texture(self.sprite_add_filemanager.submitted_content)
+
+                SPRITE_TEXTURES[self.sprite_name_input.text] = texture
+                SPRITES[self.sprite_name_input.text] = self.sprite_add_filemanager.submitted_content
+
+                self.sprites_grid.clear()
+
+                for n, shape in enumerate(SPRITES):
+                    row, col = n % 8, n // 8
+                    box = self.sprites_grid.add(arcade.gui.UIBoxLayout(), row=row, column=col)
+                    box.add(arcade.gui.UILabel(text=shape, font_size=16, text_color=arcade.color.WHITE))
+                    box.add(arcade.gui.UIImage(texture=SPRITE_TEXTURES[shape], width=self.window.width / 15, height=self.window.width / 15))
+
+                self.anchor.remove(self.sprite_add_ui)
+                arcade.unschedule(check_selection)
+
+        arcade.schedule(check_selection, 0.1)
 
     def on_show_view(self):
         super().on_show_view()
 
-        self.sprites_box.add(arcade.gui.UILabel(text="Sprites", font_size=24, text_color=arcade.color.WHITE), anchor_x="center", anchor_y="top")
+        self.sprites_ui.add(arcade.gui.UILabel(text="Sprites", font_size=24, text_color=arcade.color.WHITE), anchor_x="center", anchor_y="top")
 
-        self.sprites_grid = self.sprites_box.add(arcade.gui.UIGridLayout(columns=8, row_count=8, align="left", vertical_spacing=10, horizontal_spacing=10, size_hint=(0.95, 0.85)), anchor_x="center", anchor_y="center").with_border()
+        self.sprites_grid = self.sprites_ui.add(arcade.gui.UIGridLayout(columns=8, row_count=8, align="left", vertical_spacing=10, horizontal_spacing=10, size_hint=(0.95, 0.85), width=self.window.width * 0.95, height=self.window.height * 0.85), anchor_x="center", anchor_y="center")
 
-        for n, shape in enumerate(SHAPES):
+        for n, shape in enumerate(SPRITES):
             row, col = n % 8, n // 8
             box = self.sprites_grid.add(arcade.gui.UIBoxLayout(), row=row, column=col)
             box.add(arcade.gui.UILabel(text=shape, font_size=16, text_color=arcade.color.WHITE))
             box.add(arcade.gui.UIImage(texture=SPRITE_TEXTURES[shape], width=self.window.width / 15, height=self.window.width / 15))
 
-        self.sprites_box.add(arcade.gui.UITextureButton(text="Add Sprite", width=self.window.width / 2, height=self.window.height / 10, texture=button_texture, texture_hovered=button_hovered_texture, style=button_style))
+        add_sprite_button = self.sprites_ui.add(arcade.gui.UITextureButton(text="Add Sprite", width=self.window.width / 2, height=self.window.height / 10, texture=button_texture, texture_hovered=button_hovered_texture, style=button_style), anchor_x="center", anchor_y="bottom", align_y=10)
+        add_sprite_button.on_click = lambda event: self.add_sprite()
 
         self.triggered_events.append(["start", {}])
 
@@ -205,8 +242,7 @@ class Game(arcade.gui.UIView):
                 "change_y_velocity": self.change_y_velocity,
                 "change_color": self.change_color,
                 "change_size": self.change_size,
-                "destroy": self.destroy,
-                "morph": self.morph
+                "destroy": self.destroy
             }
         }
 
@@ -254,17 +290,23 @@ class Game(arcade.gui.UIView):
                 data = json.load(file)
 
             self.triggered_events = []
+            self.rulesets = {}
 
             if not data:
                 self.add_widget(arcade.gui.UIMessageBox(message_text="Invalid file. Could not import rules.", width=self.window.width * 0.5, height=self.window.height * 0.25))
                 return
             
-            for rule_num, ruleset in data.items():
+            for rule_num, ruleset in data["rulesets"].items():
                 kwargs = ruleset
                 kwargs["children"] = [Block(**child) for child in ruleset["children"]]
                 kwargs["vars"] = [VarBlock(**var) for var in ruleset["vars"]]
                 block = Block(**kwargs)
                 self.rulesets[rule_num] = block
+
+            self.sprite_types = data.get("sprites", SPRITES)
+            for sprite_name, sprite_path in self.sprite_types.items():
+                if not sprite_name in SPRITE_TEXTURES:
+                    SPRITE_TEXTURES[sprite_name] = arcade.load_texture(sprite_path)
             
             self.rules_box.rulesets = self.rulesets
             self.rules_box.current_rule_num = self.get_max_rule_num() + 1
@@ -272,9 +314,19 @@ class Game(arcade.gui.UIView):
 
             self.rules()
 
-        if self.mode == "export" and self.file_manager.submitted_content:            
+        if self.mode == "export" and self.file_manager.submitted_content:
             with open(self.file_manager.submitted_content, "w") as file:
-                file.write(json.dumps({rule_num: asdict(block) for rule_num, block in self.rulesets.items()}, indent=4))
+                file.write(json.dumps(
+                    {
+                        "rules": {
+                            rule_num: asdict(block) for rule_num, block in self.rulesets.items()
+                        },
+                        "sprites": self.sprite_types
+                    
+                    },
+                indent=4))
+
+            self.add_widget(arcade.gui.UIMessageBox(message_text="Rules and Sprites exported successfully!", width=self.window.width * 0.5, height=self.window.height * 0.25))
 
         if not self.mode == "simulation":
             return
@@ -307,7 +359,7 @@ class Game(arcade.gui.UIView):
     def on_key_press(self, symbol, modifiers):
         if symbol == arcade.key.ESCAPE:
             self.main_exit()
-        elif self.mode == "simulation" and symbol in [ord(key) for key in ALLOWED_INPUT]:
+        elif self.mode == "simulation" and symbol in [ord(key) if len(key) == 1 else getattr(arcade.key, key.upper()) for key in ALLOWED_INPUT]:
             self.triggered_events.append(["on_input", {"event_key": chr(symbol)}])
 
     def on_mouse_press(self, x, y, button, modifiers):
@@ -339,7 +391,9 @@ class Game(arcade.gui.UIView):
         elif self.mode == "rules":
             self.anchor.remove(self.rules_box)
         elif self.mode == "sprites":
-            self.anchor.remove(self.sprites_box)
+            self.anchor.remove(self.sprites_ui)
+        elif self.mode == "sprite_add":
+            self.anchor.remove(self.sprite_add_ui)
 
         self.anchor.trigger_full_render()
 
@@ -371,7 +425,7 @@ class Game(arcade.gui.UIView):
 
         self.mode = "sprites"
 
-        self.anchor.add(self.sprites_box, anchor_x="center", anchor_y="top")
+        self.anchor.add(self.sprites_ui, anchor_x="center", anchor_y="top")
 
     def simulation(self):
         self.disable_previous()
