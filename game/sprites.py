@@ -31,7 +31,7 @@ class BaseShape():
     def check_collision(self, other):
         if isinstance(other, Circle):
             return self._collides_with_circle(other)
-        elif isinstance(other, Rectangle):
+        elif isinstance(other, BaseRectangle):
             return self._collides_with_rectangle(other)
         elif isinstance(other, Triangle):
             return self._collides_with_triangle(other)
@@ -105,7 +105,6 @@ class Circle(pyglet.shapes.Circle, BaseShape):
         has_pos = (d1 > 0) or (d2 > 0) or (d3 > 0)
         
         return not (has_neg and has_pos)
-
 
 class BaseRectangle(BaseShape):
     def __init__(self):
@@ -182,15 +181,18 @@ class BaseRectangle(BaseShape):
 
 class Rectangle(pyglet.shapes.Rectangle, BaseRectangle):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         BaseRectangle.__init__(self)
+        super().__init__(*args, **kwargs)
         self.shape_type = "rectangle"
 
 class TexturedRectangle(pyglet.sprite.Sprite, BaseRectangle):
-    def __init__(self, shape_type, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, img, x=0, y=0, *args, **kwargs):
         BaseRectangle.__init__(self)
-        self.shape_type = shape_type
+        self.shape_type = kwargs.pop("shape_type", "textured_rectangle")
+        super().__init__(img, x, y, *args, **kwargs)
+
+    def update(self, x_gravity, y_gravity):
+        BaseShape.update(self, x_gravity, y_gravity)
 
 class Triangle(pyglet.shapes.Triangle, BaseShape):
     def __init__(self, *args, **kwargs):

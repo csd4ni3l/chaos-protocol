@@ -6,7 +6,7 @@ from utils.preload import SPRITE_TEXTURES, button_texture, button_hovered_textur
 from utils.constants import button_style, DO_RULES, IF_RULES, SPRITES, ALLOWED_INPUT
 
 from game.rules import RuleUI, Block, VarBlock
-from game.sprites import BaseShape, Rectangle, Circle, Triangle, TexturedRectangle
+from game.sprites import BaseRectangle, BaseShape, Rectangle, Circle, Triangle, TexturedRectangle
 from game.file_manager import FileManager
 
 class Game(arcade.gui.UIView):
@@ -23,7 +23,11 @@ class Game(arcade.gui.UIView):
 
         self.rules_box = RuleUI(self.window)
 
-        self.file_manager = FileManager(self.window.width * 0.95, self.window.height * 0.875, (0.95, 0.875), [".json"]).with_border()
+        self.import_file_manager = FileManager(self.window.width * 0.95, self.window.height * 0.875, (0.95, 0.875), [".json"]).with_border()
+        self.import_file_manager.change_mode("import")
+
+        self.export_file_manager = FileManager(self.window.width * 0.95, self.window.height * 0.875, (0.95, 0.875), [".json"]).with_border()
+        self.export_file_manager.change_mode("export")
 
         self.ui_selector_box = self.anchor.add(arcade.gui.UIBoxLayout(vertical=False, space_between=self.window.width / 100), anchor_x="left", anchor_y="bottom", align_y=5, align_x=self.window.width / 100)
         self.add_ui_selector("Simulation", lambda event: self.simulation())
@@ -40,6 +44,7 @@ class Game(arcade.gui.UIView):
         self.rulesets = self.rules_box.rulesets
 
         self.sprite_add_filemanager = FileManager(self.window.width * 0.9, self.window.height * 0.75, (0.9, 0.75), [".png", ".jpg", ".jpeg", ".bmp", ".gif"])
+        self.sprite_add_filemanager.change_mode("import")
         self.sprite_add_ui = arcade.gui.UIBoxLayout(size_hint=(0.95, 0.9), space_between=10)
         self.sprite_add_ui.add(arcade.gui.UILabel(text="Add Sprite", font_size=24, text_color=arcade.color.WHITE))
         
@@ -137,7 +142,7 @@ class Game(arcade.gui.UIView):
         a = float(a)
         if isinstance(shape, Circle):
             shape.radius = a
-        elif isinstance(shape, Rectangle):
+        elif isinstance(shape, BaseRectangle):
             shape.width = a
             shape.height = a
         elif isinstance(shape, Triangle):
@@ -167,10 +172,9 @@ class Game(arcade.gui.UIView):
             self.shapes.append(Triangle(x, y, x + 10, y, x + 5, y + 10, color=arcade.color.WHITE, batch=self.shape_batch))
         
         else:
-            self.shapes.append(TexturedRectangle(shape_type, img=SPRITE_TEXTURES.get(shape_type, SPRITE_TEXTURES["rectangle"]), x=x, y=y, batch=self.shape_batch))
-
+            self.shapes.append(TexturedRectangle(pyglet.image.load(self.sprite_types[shape_type]), x, y, batch=self.shape_batch, shape_type=shape_type))
+    
         shape = self.shapes[-1]
-
         self.triggered_events.append(["spawn", {"event_shape_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.shape_color}])
 
     def add_sprite(self):
@@ -283,11 +287,19 @@ class Game(arcade.gui.UIView):
             recurse(block)
         
         return max_num
+    
+    def dict_to_block(self, block_dict):
+        kwargs = block_dict.copy()
+        kwargs["children"] = [self.dict_to_block(child) for child in block_dict.get("children", [])]
+        kwargs["vars"] = [VarBlock(**var) for var in block_dict.get("vars", [])]
+        return Block(**kwargs)
 
     def on_update(self, delta_time):
-        if self.mode == "import" and self.file_manager.submitted_content:
-            with open(self.file_manager.submitted_content, "r") as file:
+        if self.mode == "import" and self.import_file_manager.submitted_content:
+            with open(self.import_file_manager.submitted_content, "r") as file:
                 data = json.load(file)
+
+            self.import_file_manager.submitted_content = None
 
             self.triggered_events = []
             self.rulesets = {}
@@ -296,26 +308,34 @@ class Game(arcade.gui.UIView):
                 self.add_widget(arcade.gui.UIMessageBox(message_text="Invalid file. Could not import rules.", width=self.window.width * 0.5, height=self.window.height * 0.25))
                 return
             
-            for rule_num, ruleset in data["rulesets"].items():
-                kwargs = ruleset
-                kwargs["children"] = [Block(**child) for child in ruleset["children"]]
-                kwargs["vars"] = [VarBlock(**var) for var in ruleset["vars"]]
-                block = Block(**kwargs)
-                self.rulesets[rule_num] = block
+            for rule_num, ruleset in data["rules"].items():
+                block = self.dict_to_block(ruleset)
+                self.rulesets[int(rule_num)] = block
 
-            self.sprite_types = data.get("sprites", SPRITES)
+            self.sprite_types = data["sprites"]
             for sprite_name, sprite_path in self.sprite_types.items():
                 if not sprite_name in SPRITE_TEXTURES:
                     SPRITE_TEXTURES[sprite_name] = arcade.load_texture(sprite_path)
+
+                SPRITES[sprite_name] = sprite_path
             
+            self.sprites_grid.clear()
+
+            for n, shape in enumerate(SPRITES):
+                row, col = n % 8, n // 8
+                box = self.sprites_grid.add(arcade.gui.UIBoxLayout(), row=row, column=col)
+                box.add(arcade.gui.UILabel(text=shape, font_size=16, text_color=arcade.color.WHITE))
+                box.add(arcade.gui.UIImage(texture=SPRITE_TEXTURES[shape], width=self.window.width / 15, height=self.window.width / 15))
+
             self.rules_box.rulesets = self.rulesets
+            self.rules_box.block_renderer.blocks = self.rulesets 
             self.rules_box.current_rule_num = self.get_max_rule_num() + 1
             self.rules_box.block_renderer.refresh()
 
             self.rules()
 
-        if self.mode == "export" and self.file_manager.submitted_content:
-            with open(self.file_manager.submitted_content, "w") as file:
+        if self.mode == "export" and self.export_file_manager.submitted_content:
+            with open(self.export_file_manager.submitted_content, "w") as file:
                 file.write(json.dumps(
                     {
                         "rules": {
@@ -325,6 +345,8 @@ class Game(arcade.gui.UIView):
                     
                     },
                 indent=4))
+
+            self.export_file_manager.submitted_content = None
 
             self.add_widget(arcade.gui.UIMessageBox(message_text="Rules and Sprites exported successfully!", width=self.window.width * 0.5, height=self.window.height * 0.25))
 
@@ -342,13 +364,29 @@ class Game(arcade.gui.UIView):
                 
                 self.recursive_execute_rule(rule, trigger_args)
 
-        for shape in self.shapes:
-            for shape_b in self.shapes:
-                if shape.check_collision(shape_b):
-                    self.triggered_events.append(["collision", {"event_a_type": shape.shape_type, "event_b_type": shape.shape_type, "shape_size": shape.shape_size, "shape_x": shape.x, "shape_y": shape.y, "shape": shape, "shape_color": shape.color}])
+        has_collision_rules = any(
+            rule.rule_type == "trigger" and rule.rule == "collision" 
+            for rule in self.rulesets.values()
+        )
 
+        for shape in self.shapes:
             shape.update(self.x_gravity, self.y_gravity)
 
+        if has_collision_rules:
+            for i, shape in enumerate(self.shapes):
+                for shape_b in self.shapes[i+1:]:
+                    if shape.check_collision(shape_b):
+                        self.triggered_events.append(["collision", {
+                            "event_a_type": shape.shape_type, 
+                            "event_b_type": shape_b.shape_type, 
+                            "shape_size": shape.shape_size, 
+                            "shape_x": shape.x, 
+                            "shape_y": shape.y, 
+                            "shape": shape, 
+                            "shape_color": shape.shape_color
+                        }])
+
+        for shape in self.shapes[:]:
             if shape.x < 0 or shape.x > self.window.width or shape.y < 0 or shape.y > self.window.height:
                 self.destroy(shape)
 
@@ -386,8 +424,10 @@ class Game(arcade.gui.UIView):
             self.rules_box.camera.zoom *= 1 + scroll_y * 0.1
 
     def disable_previous(self):
-        if self.mode in ["import", "export"]:
-            self.anchor.remove(self.file_manager)
+        if self.mode == "import":
+            self.anchor.remove(self.import_file_manager)
+        elif self.mode == "export":
+            self.anchor.remove(self.export_file_manager)
         elif self.mode == "rules":
             self.anchor.remove(self.rules_box)
         elif self.mode == "sprites":
@@ -408,17 +448,13 @@ class Game(arcade.gui.UIView):
         self.disable_previous()
         
         self.mode = "export"
-
-        self.file_manager.change_mode("export")
-        self.anchor.add(self.file_manager, anchor_x="center", anchor_y="top", align_y=-self.window.height * 0.025)
+        self.anchor.add(self.export_file_manager, anchor_x="center", anchor_y="top", align_y=-self.window.height * 0.025)
 
     def import_file(self):
         self.disable_previous()
 
         self.mode = "import"
-
-        self.file_manager.change_mode("import")
-        self.anchor.add(self.file_manager, anchor_x="center", anchor_y="top", align_y=-self.window.height * 0.025)
+        self.anchor.add(self.import_file_manager, anchor_x="center", anchor_y="top", align_y=-self.window.height * 0.025)
 
     def sprites(self):
         self.disable_previous()

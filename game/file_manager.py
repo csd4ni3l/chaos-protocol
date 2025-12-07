@@ -55,8 +55,8 @@ class FileManager(arcade.gui.UIAnchorLayout):
         self.submit_button.visible = self.mode == "export"
 
     def submit(self, content):
-        self.submitted_content = content if self.mode == "import" else f"{content}/{self.filename_input.text}"
-        
+        self.submitted_content = content if self.mode == "import" else os.path.join(content, self.filename_input.text)
+
     def get_content(self, directory):
         if not directory in self.content_cache or time.perf_counter() - self.content_cache[directory][-1] >= 30:
             try:
@@ -113,11 +113,11 @@ class FileManager(arcade.gui.UIAnchorLayout):
 
         for file in self.get_content(self.current_directory):
             self.file_buttons.append(self.files_box.add(arcade.gui.UITextureButton(texture=button_texture, texture_hovered=button_hovered_texture, text=file, style=button_style, width=self.filemanager_width / 1.5, height=self.filemanager_height * 0.05,)))
-            if os.path.isdir(f"{self.current_directory}/{file}"):
-                self.file_buttons[-1].on_click = lambda event, directory=f"{self.current_directory}/{file}": self.change_directory(directory)
+            if os.path.isdir(os.path.join(self.current_directory, file)):
+                self.file_buttons[-1].on_click = lambda event, directory=os.path.join(self.current_directory, file): self.change_directory(directory)
             else:
-                self.file_buttons[-1].on_click = lambda event, file=f"{self.current_directory}/{file}": self.submit(file)
-
+                self.file_buttons[-1].on_click = lambda event, file=os.path.join(self.current_directory, file): self.submit(file)
+    
     def change_directory(self, directory):
         if directory.startswith("//"): # Fix / paths
             directory = directory[1:]
