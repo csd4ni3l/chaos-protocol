@@ -338,6 +338,7 @@ class RuleUI(arcade.gui.UIAnchorLayout):
     def remove_from_parent(self, block_to_remove, parents):
         for parent in parents:
             if block_to_remove in parent.children:
+                self.rulesets[block_to_remove.rule_num] = block_to_remove 
                 parent.children.remove(block_to_remove)
                 return True
             if self.remove_from_parent(block_to_remove, parent.children):
