@@ -42,7 +42,7 @@ jobs:
           include-data-dir: assets=assets
           include-data-files: CREDITS=CREDITS
           mode: onefile 
-          output-file: FleetCommander
+          output-file: ChaosProtocol
 
       - name: Locate and rename executable (Linux)
         if: matrix.os == 'ubuntu-22.04'
@@ -51,29 +51,29 @@ jobs:
           echo "Searching for built Linux binary..."
           # List to help debugging when paths change
           ls -laR . | head -n 500 || true
-          BIN=$(find . -maxdepth 4 -type f -name 'FleetCommander*' -perm -u+x | head -n1 || true)
+          BIN=$(find . -maxdepth 4 -type f -name 'ChaosProtocol*' -perm -u+x | head -n1 || true)
           if [ -z "${BIN}" ]; then
             echo "ERROR: No Linux binary found after build"
             exit 1
           fi
           echo "Found: ${BIN}"
           mkdir -p build_output
-          cp "${BIN}" build_output/FleetCommander.bin
-          chmod +x build_output/FleetCommander.bin
-          echo "Executable ready: build_output/FleetCommander.bin"
+          cp "${BIN}" build_output/ChaosProtocol.bin
+          chmod +x build_output/ChaosProtocol.bin
+          echo "Executable ready: build_output/ChaosProtocol.bin"
         shell: bash
 
       - name: Locate and rename executable (Windows)
         if: matrix.os == 'windows-latest'
         run: |
           Write-Host "Searching for built Windows binary..."
-          Get-ChildItem -Recurse -File -Filter 'FleetCommander*.exe' | Select-Object -First 1 | ForEach-Object {
+          Get-ChildItem -Recurse -File -Filter 'ChaosProtocol*.exe' | Select-Object -First 1 | ForEach-Object {
             Write-Host ("Found: " + $_.FullName)
             New-Item -ItemType Directory -Force -Path build_output | Out-Null
-            Copy-Item $_.FullName "build_output\FleetCommander.exe"
-            Write-Host "Executable ready: build_output\FleetCommander.exe"
+            Copy-Item $_.FullName "build_output\ChaosProtocol.exe"
+            Write-Host "Executable ready: build_output\ChaosProtocol.exe"
           }
-          if (!(Test-Path build_output\FleetCommander.exe)) {
+          if (!(Test-Path build_output\ChaosProtocol.exe)) {
             Write-Error "ERROR: No Windows binary found after build"
             exit 1
           }
@@ -83,7 +83,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}
-          path: build_output/FleetCommander.* 
+          path: build_output/ChaosProtocol.* 
   
   release:
     runs-on: ubuntu-latest
@@ -114,5 +114,6 @@ jobs:
               --notes "Automated build for $TAG"
           fi
           # Upload the executables directly (no zip files)
-          gh release upload "$TAG" downloads/linux/FleetCommander.bin --clobber
-          gh release upload "$TAG" downloads/windows/FleetCommander.exe --clobber
+          gh release upload "$TAG" downloads/linux/ChaosProtocol.bin --clobber
+          gh release upload "$TAG" downloads/windows/ChaosProtocol.exe --clobber
+          
