@@ -6,3 +6,9 @@ The problem: it hasn't been well tested.
 
 ## Speed is a big problem of the project, especially collision detections, which are very expensive.
 I am not using spatial hashing right now, and i had no time to optimize the code. I'm sorry.
+
+## Mirrors
+
+[![Forgejo](https://img.shields.io/badge/Forgejo-git.csd4ni3l.hu-1e90ff)](https://git.csd4ni3l.hu/csd4ni3l/chaos-protocol)
+[![GitHub](https://img.shields.io/badge/GitHub-github.com-181717)](https://github.com/csd4ni3l/chaos-protocol)
+[![Codeberg](https://img.shields.io/badge/Codeberg-codeberg.org-2185D0)](https://codeberg.org/csd4ni3l/chaos-protocol)
